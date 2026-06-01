@@ -75,7 +75,7 @@ export default function CoursePage() {
         {/* חלק ימין: חומרי לימוד */}
         <div className="space-y-6 flex flex-col">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">متפ 1</h1>
+            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">מתפ 1</h1>
             <p className="text-slate-400 text-sm mt-1">מבוא ללמידה וניתוח אלגוריתמים</p>
           </div>
 
