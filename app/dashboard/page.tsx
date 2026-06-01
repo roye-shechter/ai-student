@@ -1,11 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { BookOpen, UploadCloud, FileText, PlayCircle } from "lucide-react"
 
-// נתוני הגרפים
 const barData = [
   { name: "שבוע 1", hours: 12 },
   { name: "שבוע 2", hours: 19 },
@@ -19,7 +19,6 @@ const pieData = [
   { name: "נותר ללמוד", value: 30, color: "#1e293b" }
 ]
 
-// נתוני קבצים לדוגמה
 const recentFiles = [
   { name: "סיכום_MIPS_וקונבנציות.pdf", size: "2.4 MB", date: "היום" },
   { name: "מצגת_C_Pointers.pdf", size: "1.1 MB", date: "אתמול" },
@@ -37,7 +36,7 @@ export default function Dashboard() {
               AI Student | אזור אישי
             </h1>
             <p className="text-slate-400 text-lg mt-2">
-              ברוך הבא, ירמיאל ליפשיץ. הנה סיכום מצב הלמידה שלך.
+              ברוך הבא, ירחמיאל ליפשיץ. הנה סיכום מצב הלמידה שלך.
             </p>
           </div>
           <Button variant="outline" className="bg-slate-900 border-slate-700 text-cyan-400 hover:bg-slate-800 hover:text-cyan-300">
@@ -65,10 +64,12 @@ export default function Dashboard() {
                 </div>
                 <p className="text-xs text-slate-500 mt-2 mb-4">הושלמו 80% ממטלות הקורס</p>
                 <div className="pt-4 border-t border-slate-800">
-                  <Button className="w-full bg-slate-800 hover:bg-cyan-600 text-white transition-colors flex items-center gap-2">
-                    <PlayCircle size={18} />
-                    היכנס ללמידה
-                  </Button>
+                  <Link href="/dashboard/matap1">
+                    <Button className="w-full bg-slate-800 hover:bg-cyan-600 text-white transition-colors flex items-center gap-2">
+                      <PlayCircle size={18} />
+                      היכנס ללמידה
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -85,10 +86,12 @@ export default function Dashboard() {
                 </div>
                 <p className="text-xs text-slate-500 mt-2 mb-4">הושלמו 35% ממטלות הקורס</p>
                 <div className="pt-4 border-t border-slate-800">
-                  <Button className="w-full bg-slate-800 hover:bg-cyan-600 text-white transition-colors flex items-center gap-2">
-                    <PlayCircle size={18} />
-                    היכנס ללמידה
-                  </Button>
+                  <Link href="/dashboard/matap2">
+                    <Button className="w-full bg-slate-800 hover:bg-cyan-600 text-white transition-colors flex items-center gap-2">
+                      <PlayCircle size={18} />
+                      היכנס ללמידה
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -98,12 +101,10 @@ export default function Dashboard() {
 
         {/* אזור חומרי למידה והעלאה */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* אזור גרירה והעלאה */}
           <div className="lg:col-span-2">
             <h2 className="text-2xl font-semibold text-slate-200 mb-4 flex items-center gap-2">
               <UploadCloud className="text-cyan-500" size={24} />
-              העלאת חומרי למידה
+              העלאת חומרי למידה כלליים
             </h2>
             <div className="bg-slate-900/50 border-2 border-dashed border-slate-700 hover:border-cyan-500/50 transition-colors rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer h-48">
               <UploadCloud className="text-slate-400 mb-4" size={40} />
@@ -115,7 +116,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* קבצים אחרונים שעובדו */}
           <div>
             <h2 className="text-2xl font-semibold text-slate-200 mb-4 flex items-center gap-2">
               <FileText className="text-cyan-500" size={24} />
