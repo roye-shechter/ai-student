@@ -1,0 +1,264 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// =====================================================
+// NextAuth.js Models
+// =====================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =====================================================
+// Core Application Models
+// =====================================================
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  username         String    @unique
+  passwordHash     String?
+  fullName         String?
+  avatarUrl        String?
+  role             String    @default("student")
+  moodleUserId     String?   @unique
+  moodleAccessToken String?
+  moodleRefreshToken String?
+  tokenExpiresAt   DateTime?
+  emailVerified    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime?
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  enrollments   Enrollment[]
+  userMaterials UserMaterial[]
+  quizAttempts  QuizAttempt[]
+  learningSessions LearningSession[]
+  chatHistory   ChatHistory[]
+  vectorMetadata VectorMetadata[]
+
+  @@index([email])
+  @@index([username])
+  @@index([moodleUserId])
+  @@map("users")
+}
+
+model Course {
+  id             String    @id @default(cuid())
+  moodleCourseId String?   @unique
+  courseCode     String    @unique
+  courseName     String
+  description    String?
+  instructorName String?
+  startDate      DateTime?
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  enrollments      Enrollment[]
+  courseMaterials  CourseMaterial[]
+  userMaterials    UserMaterial[]
+  quizAttempts     QuizAttempt[]
+  learningSessions LearningSession[]
+  chatHistory      ChatHistory[]
+  vectorMetadata   VectorMetadata[]
+
+  @@index([courseCode])
+  @@index([moodleCourseId])
+  @@map("courses")
+}
+
+model Enrollment {
+  id                    String    @id @default(cuid())
+  userId                String
+  courseId              String
+  enrolledAt            DateTime  @default(now())
+  completionPercentage  Float     @default(0.00)
+  lastAccessedAt        DateTime?
+  isActive              Boolean   @default(true)
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model CourseMaterial {
+  id                String    @id @default(cuid())
+  courseId          String
+  moodleFileId      String?
+  title             String
+  fileType          String?
+  fileUrl           String?
+  fileSizeBytes     BigInt?
+  sectionName       String?
+  uploadDate        DateTime?
+  isProcessed       Boolean   @default(false)
+  processingStatus  String    @default("pending")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([processingStatus])
+  @@map("course_materials")
+}
+
+model UserMaterial {
+  id                String    @id @default(cuid())
+  userId            String
+  courseId          String?
+  title             String
+  fileType          String?
+  filePath          String
+  fileSizeBytes     BigInt?
+  isProcessed       Boolean   @default(false)
+  processingStatus  String    @default("pending")
+  uploadedAt        DateTime  @default(now())
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([courseId])
+  @@map("user_materials")
+}
+
+model QuizAttempt {
+  id               String    @id @default(cuid())
+  userId           String
+  courseId         String
+  quizTitle        String
+  moodleQuizId     String?
+  scorePercentage  Float?
+  totalQuestions   Int?
+  correctAnswers   Int?
+  timeSpentSeconds Int?
+  attemptedAt      DateTime  @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([courseId])
+  @@map("quiz_attempts")
+}
+
+model LearningSession {
+  id              String    @id @default(cuid())
+  userId          String
+  courseId        String
+  sessionStart    DateTime
+  sessionEnd      DateTime?
+  durationMinutes Int?
+  activityType    String?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([sessionStart])
+  @@map("learning_sessions")
+}
+
+model ChatHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  courseId        String
+  sessionId       String?
+  role            String
+  messageContent  String
+  contextUsed     String   @default("[]")
+  timestamp       DateTime @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([sessionId])
+  @@index([timestamp])
+  @@map("chat_history")
+}
+
+model VectorMetadata {
+  id              String   @id @default(cuid())
+  userId          String
+  courseId        String
+  materialId      String?
+  namespace       String
+  vectorCount     Int?
+  embeddingModel  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, materialId])
+  @@index([namespace])
+  @@index([userId, courseId])
+  @@map("vector_metadata")
+}
