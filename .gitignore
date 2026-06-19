@@ -41,3 +41,14 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# local database (SQLite dev db + sidecar files)
+dev.db
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# local verification artifacts (puppeteer driver + screenshots)
+/drive.mjs
+/.shots/

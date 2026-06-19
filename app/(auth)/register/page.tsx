@@ -71,25 +71,25 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4" dir="rtl">
-      <Card className="w-full max-w-md bg-slate-900 text-white border-slate-800 shadow-2xl shadow-cyan-900/20">
+    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] p-4" dir="rtl">
+      <Card className="w-full max-w-md bg-[#141414] text-white border-[#d4af37]/30 shadow-2xl shadow-[#d4af37]/10">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">
+          <CardTitle className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#FFD700] mb-2">
             הרשמה למערכת
           </CardTitle>
-          <CardDescription className="text-slate-400 text-lg">
+          <CardDescription className="text-neutral-400 text-lg">
             צור חשבון חדש ב-AI Student
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 mt-4">
             {error && (
-              <div className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm text-center">
+              <div className="bg-red-950/50 border border-red-800 text-red-200 px-4 py-3 rounded-lg text-sm text-center">
                 {error}
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-slate-300 text-sm">
+              <Label htmlFor="fullName" className="text-neutral-300 text-sm">
                 שם מלא (אופציונלי)
               </Label>
               <Input
@@ -98,12 +98,12 @@ export default function RegisterPage() {
                 placeholder="ירחמיאל ליפשיץ"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="bg-slate-800 border-slate-700 text-white focus-visible:ring-cyan-500 h-11"
+                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-11"
                 disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-300 text-sm">
+              <Label htmlFor="email" className="text-neutral-300 text-sm">
                 כתובת אימייל
               </Label>
               <Input
@@ -112,13 +112,13 @@ export default function RegisterPage() {
                 placeholder="yerahmiel@example.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-slate-800 border-slate-700 text-white focus-visible:ring-cyan-500 h-11"
+                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-11"
                 required
                 disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-300 text-sm">
+              <Label htmlFor="username" className="text-neutral-300 text-sm">
                 שם משתמש
               </Label>
               <Input
@@ -127,13 +127,13 @@ export default function RegisterPage() {
                 placeholder="yerahmiel"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="bg-slate-800 border-slate-700 text-white focus-visible:ring-cyan-500 h-11"
+                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-11"
                 required
                 disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-300 text-sm">
+              <Label htmlFor="password" className="text-neutral-300 text-sm">
                 סיסמה
               </Label>
               <Input
@@ -142,14 +142,14 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-slate-800 border-slate-700 text-white focus-visible:ring-cyan-500 h-11"
+                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-11"
                 required
                 disabled={isLoading}
                 minLength={6}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-slate-300 text-sm">
+              <Label htmlFor="confirmPassword" className="text-neutral-300 text-sm">
                 אימות סיסמה
               </Label>
               <Input
@@ -158,7 +158,7 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                className="bg-slate-800 border-slate-700 text-white focus-visible:ring-cyan-500 h-11"
+                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-11"
                 required
                 disabled={isLoading}
               />
@@ -168,7 +168,7 @@ export default function RegisterPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-cyan-600 hover:bg-cyan-500 text-white h-12 text-lg font-medium transition-colors"
+              className="w-full bg-[#d4af37] hover:bg-[#FFD700] text-black h-12 text-lg font-semibold transition-colors"
             >
               {isLoading ? (
                 <>
@@ -179,9 +179,9 @@ export default function RegisterPage() {
                 "הרשם למערכת"
               )}
             </Button>
-            <div className="text-center text-sm text-slate-400">
+            <div className="text-center text-sm text-neutral-400">
               כבר יש לך חשבון?{" "}
-              <Link href="/" className="text-cyan-400 hover:text-cyan-300 font-medium">
+              <Link href="/" className="text-[#d4af37] hover:text-[#FFD700] font-medium">
                 התחבר כאן
               </Link>
             </div>
