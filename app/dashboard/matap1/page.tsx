@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2 } from "lucide-react"
+import { UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2 } from "lucide-react"
 
 // קוד הקורס מזהה את הקורס בצד השרת (מפת ל-courseId דרך Prisma)
 const COURSE_CODE = "matap1"
+
+type UploadedDoc = { title: string; chunkCount: number }
 
 export default function CoursePage() {
   const [messages, setMessages] = useState([
@@ -17,6 +19,50 @@ export default function CoursePage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // Document ingestion state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([])
+
+  const handleUpload = async (file: File) => {
+    setIsUploading(true)
+    setUploadStatus(`מעלה ומטמיע את "${file.name}"...`)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("courseCode", COURSE_CODE)
+
+      const response = await fetch("/api/upload", { method: "POST", body: formData })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || "ההעלאה נכשלה")
+      }
+
+      setUploadedDocs((prev) => [...prev, { title: data.title, chunkCount: data.chunkCount }])
+      setUploadStatus(null)
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `המסמך "${data.title}" נטען ונוסף לבסיס הידע (${data.chunkCount} קטעים). עכשיו אפשר לשאול עליו שאלות.`,
+        },
+      ])
+    } catch (error) {
+      setUploadStatus(error instanceof Error ? error.message : "אירעה שגיאה בהעלאת המסמך")
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleUpload(file)
+  }
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -89,15 +135,54 @@ export default function CoursePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 flex-1 overflow-y-auto">
-              <div className="border-2 border-dashed border-[#2a2a2a] rounded-lg p-4 text-center bg-[#0a0a0a]/40">
-                <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
-                <span className="text-xs text-neutral-300 block">הוראה 1 (נטען אוטומטית כבסיס ידע לטסט)</span>
-              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.txt,application/pdf,text/plain"
+                onChange={onFileSelected}
+                className="hidden"
+                disabled={isUploading}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full border-2 border-dashed border-[#2a2a2a] rounded-lg p-6 text-center bg-[#0a0a0a]/40 transition-colors hover:border-[#d4af37]/50 hover:bg-[#0a0a0a]/70 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isUploading ? (
+                  <Loader2 size={28} className="mx-auto text-[#d4af37] mb-2 animate-spin" />
+                ) : (
+                  <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
+                )}
+                <span className="text-xs text-neutral-300 block">
+                  {isUploading ? "מעבד ומטמיע את המסמך..." : "לחץ להעלאת קובץ (PDF / TXT)"}
+                </span>
+                <span className="text-[10px] text-neutral-500 block mt-1">
+                  הקובץ ייחתך, יוטמע (Embeddings) ויאוחסן ב-Pinecone
+                </span>
+              </button>
+
+              {uploadStatus && !isUploading && (
+                <p className="text-xs text-red-400 text-center">{uploadStatus}</p>
+              )}
+
               <div className="space-y-2">
-                <div className="flex items-center gap-2 p-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-xs text-neutral-300">
-                  <FileText size={14} className="text-[#d4af37]" />
-                  <span className="truncate">הרצאה_1_מבוא_ומודלים.pdf</span>
-                </div>
+                {uploadedDocs.length === 0 && !isUploading && (
+                  <p className="text-[11px] text-neutral-500 text-center">עדיין לא הועלו חומרים לקורס זה.</p>
+                )}
+                {uploadedDocs.map((doc, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 p-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-xs text-neutral-300"
+                  >
+                    <FileText size={14} className="text-[#d4af37] shrink-0" />
+                    <span className="truncate flex-1">{doc.title}</span>
+                    <span className="flex items-center gap-1 text-[10px] text-green-400 shrink-0">
+                      <CheckCircle2 size={12} />
+                      {doc.chunkCount} קטעים
+                    </span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
