@@ -77,11 +77,8 @@ model User {
   accounts      Account[]
   sessions      Session[]
   enrollments   Enrollment[]
-  userMaterials UserMaterial[]
   quizAttempts  QuizAttempt[]
   learningSessions LearningSession[]
-  chatHistory   ChatHistory[]
-  vectorMetadata VectorMetadata[]
   documents     Document[]
   chatSessions  ChatSession[]
 
@@ -107,12 +104,8 @@ model Course {
 
   // Relations
   enrollments      Enrollment[]
-  courseMaterials  CourseMaterial[]
-  userMaterials    UserMaterial[]
   quizAttempts     QuizAttempt[]
   learningSessions LearningSession[]
-  chatHistory      ChatHistory[]
-  vectorMetadata   VectorMetadata[]
   documents        Document[]
   chatSessions     ChatSession[]
 
@@ -138,50 +131,6 @@ model Enrollment {
   @@index([userId])
   @@index([courseId])
   @@map("enrollments")
-}
-
-model CourseMaterial {
-  id                String    @id @default(cuid())
-  courseId          String
-  moodleFileId      String?
-  title             String
-  fileType          String?
-  fileUrl           String?
-  fileSizeBytes     BigInt?
-  sectionName       String?
-  uploadDate        DateTime?
-  isProcessed       Boolean   @default(false)
-  processingStatus  String    @default("pending")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@index([courseId])
-  @@index([processingStatus])
-  @@map("course_materials")
-}
-
-model UserMaterial {
-  id                String    @id @default(cuid())
-  userId            String
-  courseId          String?
-  title             String
-  fileType          String?
-  filePath          String
-  fileSizeBytes     BigInt?
-  isProcessed       Boolean   @default(false)
-  processingStatus  String    @default("pending")
-  uploadedAt        DateTime  @default(now())
-
-  // Relations
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([courseId])
-  @@map("user_materials")
 }
 
 model QuizAttempt {
@@ -223,48 +172,6 @@ model LearningSession {
   @@index([courseId])
   @@index([sessionStart])
   @@map("learning_sessions")
-}
-
-model ChatHistory {
-  id              String   @id @default(cuid())
-  userId          String
-  courseId        String
-  sessionId       String?
-  role            String
-  messageContent  String
-  contextUsed     String   @default("[]")
-  timestamp       DateTime @default(now())
-
-  // Relations
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([courseId])
-  @@index([sessionId])
-  @@index([timestamp])
-  @@map("chat_history")
-}
-
-model VectorMetadata {
-  id              String   @id @default(cuid())
-  userId          String
-  courseId        String
-  materialId      String?
-  namespace       String
-  vectorCount     Int?
-  embeddingModel  String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, courseId, materialId])
-  @@index([namespace])
-  @@index([userId, courseId])
-  @@map("vector_metadata")
 }
 
 // =====================================================

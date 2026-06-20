@@ -1,51 +1,108 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { chat } from "@/lib/rag/chat"
 
-// מאתחלים את ג'מיני עם המפתח החסוי מהקובץ הסודי
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+/**
+ * Chat endpoint — drives the enterprise RAG pipeline (lib/rag/chat.ts):
+ * embed the question (OpenAI) → retrieve from Pinecone (scoped to the
+ * authenticated user + course) → answer with Gemini → persist the turn in
+ * Postgres.
+ *
+ * The browser only sends the message and which course it is asking about.
+ * `userId` is taken from the authenticated session (never trusted from the
+ * client), and a ChatSession is resolved/created server-side so the pipeline
+ * has the `sessionId` it needs for conversational memory.
+ */
 
-// הטקסט הקשיח שלנו לבדיקה - סיכום על מכפלה וקטורית וסקלרית
-const hardcodedContext = `
-סיכום נושא: מכפלה סקלרית ומכפלה וקטורית
-
-1. מכפלה סקלרית (Dot Product):
-- הגדרה: פעולה אלגברית בין שני וקטורים שמחזירה סקלר (מספר בודד, ללא כיוון).
-- נוסחה מתמטית: A · B = |A| * |B| * cos(θ), כאשר θ היא הזווית בין הוקטורים.
-- משמעות גיאומטרית: הפעולה משקפת עד כמה שני הוקטורים מקבילים זה לזה. בפועל, מדובר במכפלת הגודל של וקטור אחד בהיטל של הוקטור השני עליו.
-- דוגמה פיזיקלית: חישוב שטף חשמלי (מכפלה סקלרית של וקטור השדה החשמלי ווקטור השטח) או עבודה (מכפלה של כוח והעתק).
-
-2. מכפלה וקטורית (Cross Product):
-- הגדרה: פעולה בין שני וקטורים שמחזירה וקטור חדש במרחב התלת-ממדי.
-- כיוון הוקטור: הוקטור החדש תמיד מאונך (ניצב) למישור שנוצר על ידי שני הוקטורים המקוריים. הכיוון המדויק נקבע על פי "כלל יד ימין".
-- גודל הוקטור (נוסחה): |A × B| = |A| * |B| * sin(θ).
-- משמעות גיאומטרית: הגודל של הוקטור החדש שווה לשטח המקבילית ששני הוקטורים המקוריים יוצרים.
-- דוגמה פיזיקלית: חישוב כוח לורנץ הפועל על מטען חשמלי הנע בשדה מגנטי, או חישוב מומנט כוח (Torque).
-`;
+type ChatRequestBody = {
+  message?: unknown
+  courseCode?: unknown
+  courseId?: unknown
+  sessionId?: unknown
+}
 
 export async function POST(req: Request) {
+  // 1. Authenticate — the user id is the hard tenancy key for retrieval.
+  const session = await getServerSession(authOptions)
+  const userId = session?.user?.id
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // 2. Parse and validate the request.
+  let body: ChatRequestBody
   try {
-    // שולפים רק את הודעת המשתמש, מתעלמים מה-context של ה-Frontend כרגע
-    const { message } = await req.json();
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  }
 
-    // הגדרת המודל יחד עם הוראות מערכת קשוחות (System Instruction)
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: "אתה עוזר הוראה אקדמי קפדן ודייקן לקורס מתפ 1. התפקיד שלך הוא לענות על שאלות הסטודנט אך ורק על בסיס הטקסט המצורף תחת חומרי הלימוד (Context). אם התשובה לשאלה אינה נמצאת באופן מפורש או משתמע ישירות מהחומר המצורף, עליך לענות במילים האלו בדיוק: 'המידע אינו מופיע בחומרי הלימוד של הקורס'. אל תמציא עובדות, אל תניח הנחות ואל תשתמש בשום ידע חיצוני מהאינטרנט.",
-    });
+  const message = typeof body.message === "string" ? body.message.trim() : ""
+  if (!message) {
+    return NextResponse.json({ error: "message is required" }, { status: 400 })
+  }
 
-    // הרכבת הפרומפט שכולל את חומרי הלימוד הקשיחים (Hardcoded) ואת השאלה
-    const prompt = `חומרי הלימוד של הקורס (Context):
-    ${hardcodedContext}
+  // 3. Resolve the course. The UI identifies a course by its human courseCode
+  //    (e.g. "matap1"); a raw courseId is also accepted.
+  const courseId = typeof body.courseId === "string" ? body.courseId : undefined
+  const courseCode = typeof body.courseCode === "string" ? body.courseCode : undefined
 
-    שאלת הסטודנט:
-    ${message}`;
+  const course = courseId
+    ? await prisma.course.findUnique({ where: { id: courseId } })
+    : courseCode
+      ? await prisma.course.findUnique({ where: { courseCode } })
+      : null
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+  if (!course) {
+    return NextResponse.json(
+      { error: "Unknown course (provide a valid courseCode or courseId)" },
+      { status: 400 }
+    )
+  }
 
-    return NextResponse.json({ text: responseText });
+  try {
+    // 4. Resolve the conversation thread. Reuse the supplied session if it
+    //    belongs to this user+course, otherwise reuse the latest thread or
+    //    open a new one.
+    const requestedSessionId =
+      typeof body.sessionId === "string" ? body.sessionId : undefined
+
+    let chatSession = requestedSessionId
+      ? await prisma.chatSession.findFirst({
+          where: { id: requestedSessionId, userId, courseId: course.id },
+        })
+      : await prisma.chatSession.findFirst({
+          where: { userId, courseId: course.id },
+          orderBy: { updatedAt: "desc" },
+        })
+
+    if (!chatSession) {
+      chatSession = await prisma.chatSession.create({
+        data: { userId, courseId: course.id },
+      })
+    }
+
+    // 5. Run the full RAG turn.
+    const reply = await chat({
+      userId,
+      courseId: course.id,
+      sessionId: chatSession.id,
+      message,
+    })
+
+    return NextResponse.json({
+      text: reply.answer,
+      answer: reply.answer,
+      chunks: reply.chunks,
+      sessionId: chatSession.id,
+    })
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return NextResponse.json({ error: "שגיאה בתקשורת עם ה-AI" }, { status: 500 });
+    console.error("RAG chat error:", error)
+    return NextResponse.json(
+      { error: "שגיאה בתקשורת עם ה-AI" },
+      { status: 500 }
+    )
   }
 }

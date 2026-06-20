@@ -7,14 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2 } from "lucide-react"
 
-// טקסט לדוגמה שמדמה חומר לימוד שהועלה (לצורך בדיקת ה-AI)
-const mockCourseContext = `
-קורס מתפ 1 - סיכום הרצאה 1:
-בדיון על מודלים של רשתות נוירונים, פונקציית העלות (Loss Function) שנבחרה לאופטימיזציה היא MSE (Mean Squared Error).
-קצב הלמידה (Learning Rate) שנקבע כברירת מחדל לפרויקט הוא 0.001. 
-משקולות הרשת מאותחלות בצורה אקראית לפי הפצת גאוסיאן עם ממוצע 0 וסטיית תקן 0.01.
-אין להשתמש בפונקציית אקטיבציה מסוג Sigmoid בשכבות החבויות בשל בעיית התפוגגות הגרדיאנט (Vanishing Gradient).
-`;
+// קוד הקורס מזהה את הקורס בצד השרת (מפת ל-courseId דרך Prisma)
+const COURSE_CODE = "matap1"
 
 export default function CoursePage() {
   const [messages, setMessages] = useState([
@@ -22,6 +16,7 @@ export default function CoursePage() {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -32,17 +27,24 @@ export default function CoursePage() {
     setIsLoading(true)
 
     try {
-      // קריאת ה-API האמיתית לשרת של ג'מיני שיצרנו
+      // קריאת ה-API האמיתית — מנוע ה-RAG (Pinecone + Gemini) בצד השרת
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: input,
-          context: mockCourseContext // שולחים את חומר הלימוד המדומה
+          courseCode: COURSE_CODE,
+          sessionId, // שומר על רצף השיחה (conversational memory)
         }),
       })
 
       const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Request failed")
+      }
+
+      if (data.sessionId) setSessionId(data.sessionId)
 
       setMessages((prev) => [
         ...prev,
