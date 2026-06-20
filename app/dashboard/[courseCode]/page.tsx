@@ -98,8 +98,25 @@ export default function CoursePage() {
       formData.append("courseCode", courseCode)
 
       const response = await fetch("/api/upload", { method: "POST", body: formData })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data?.error || "ההעלאה נכשלה")
+
+      // The server can fail before our JSON handler runs (e.g. a crash) and
+      // return an HTML error page. Only parse JSON when it actually is JSON,
+      // so a bad response shows a clean message instead of crashing the UI.
+      const contentType = response.headers.get("content-type") || ""
+      let data: { error?: string; title?: string; chunkCount?: number } | null = null
+      if (contentType.includes("application/json")) {
+        try {
+          data = await response.json()
+        } catch {
+          data = null
+        }
+      }
+
+      if (!response.ok || !data) {
+        throw new Error(
+          data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
+        )
+      }
 
       setUploadStatus(null)
       setMessages((prev) => [

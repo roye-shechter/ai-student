@@ -46,85 +46,89 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
 }
 
 export async function POST(req: Request) {
-  // 1. Authenticate — userId is the hard tenancy key for the embeddings.
-  const session = await getServerSession(authOptions)
-  const userId = session?.user?.id
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  // 2. Read the multipart form.
-  let form: FormData
+  // Everything runs inside one comprehensive try/catch so that ANY failure
+  // (auth, DB, file parsing, OpenAI/Pinecone, etc.) is returned as JSON. Next
+  // would otherwise serve its default HTML error page on an unhandled throw,
+  // which breaks the client's response.json().
   try {
-    form = await req.formData()
-  } catch {
-    return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 })
-  }
+    // 1. Authenticate — userId is the hard tenancy key for the embeddings.
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  const file = form.get("file")
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 })
-  }
-  if (file.size === 0) {
-    return NextResponse.json({ error: "File is empty" }, { status: 400 })
-  }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 413 })
-  }
-  if (!isPdf(file) && !isTxt(file)) {
-    return NextResponse.json(
-      { error: "Unsupported file type (PDF or TXT only)" },
-      { status: 415 }
-    )
-  }
+    // 2. Read the multipart form.
+    let form: FormData
+    try {
+      form = await req.formData()
+    } catch {
+      return NextResponse.json({ error: "Expected multipart/form-data" }, { status: 400 })
+    }
 
-  // 3. Resolve the course this material belongs to.
-  const courseId = typeof form.get("courseId") === "string" ? (form.get("courseId") as string) : undefined
-  const courseCode = typeof form.get("courseCode") === "string" ? (form.get("courseCode") as string) : undefined
+    const file = form.get("file")
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 })
+    }
+    if (file.size === 0) {
+      return NextResponse.json({ error: "File is empty" }, { status: 400 })
+    }
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 413 })
+    }
+    if (!isPdf(file) && !isTxt(file)) {
+      return NextResponse.json(
+        { error: "Unsupported file type (PDF or TXT only)" },
+        { status: 415 }
+      )
+    }
 
-  const course = courseId
-    ? await prisma.course.findUnique({ where: { id: courseId } })
-    : courseCode
-      ? await prisma.course.findUnique({ where: { courseCode } })
-      : null
+    // 3. Resolve the course this material belongs to.
+    const courseId = typeof form.get("courseId") === "string" ? (form.get("courseId") as string) : undefined
+    const courseCode = typeof form.get("courseCode") === "string" ? (form.get("courseCode") as string) : undefined
 
-  if (!course) {
-    return NextResponse.json(
-      { error: "Unknown course (provide a valid courseCode or courseId)" },
-      { status: 400 }
-    )
-  }
+    const course = courseId
+      ? await prisma.course.findUnique({ where: { id: courseId } })
+      : courseCode
+        ? await prisma.course.findUnique({ where: { courseCode } })
+        : null
 
-  // 4. Extract raw text.
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  let text: string
-  try {
-    text = isPdf(file) ? await extractPdfText(bytes) : new TextDecoder("utf-8").decode(bytes)
-  } catch (error) {
-    console.error("Text extraction failed:", error)
-    return NextResponse.json({ error: "Failed to read the document" }, { status: 422 })
-  }
+    if (!course) {
+      return NextResponse.json(
+        { error: "Unknown course (provide a valid courseCode or courseId)" },
+        { status: 400 }
+      )
+    }
 
-  if (!text.trim()) {
-    return NextResponse.json(
-      { error: "No extractable text found (scanned/image-only PDFs are not supported)" },
-      { status: 422 }
-    )
-  }
+    // 4. Extract raw text.
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    let text: string
+    try {
+      text = isPdf(file) ? await extractPdfText(bytes) : new TextDecoder("utf-8").decode(bytes)
+    } catch (error) {
+      console.error("Text extraction failed:", error)
+      return NextResponse.json({ error: "Failed to read the document" }, { status: 422 })
+    }
 
-  // 5. Record the document, then run the ingestion pipeline.
-  const fileType = isPdf(file) ? "pdf" : "txt"
-  const document = await prisma.document.create({
-    data: {
-      userId,
-      courseId: course.id,
-      title: file.name,
-      fileType,
-      fileSizeBytes: BigInt(file.size),
-    },
-  })
+    if (!text.trim()) {
+      return NextResponse.json(
+        { error: "No extractable text found (scanned/image-only PDFs are not supported)" },
+        { status: 422 }
+      )
+    }
 
-  try {
+    // 5. Record the document, then run the ingestion pipeline.
+    const fileType = isPdf(file) ? "pdf" : "txt"
+    const document = await prisma.document.create({
+      data: {
+        userId,
+        courseId: course.id,
+        title: file.name,
+        fileType,
+        fileSizeBytes: BigInt(file.size),
+      },
+    })
+
     const result = await ingestDocument({
       userId,
       courseId: course.id,
@@ -139,10 +143,14 @@ export async function POST(req: Request) {
       namespace: result.namespace,
     })
   } catch (error) {
-    // ingestDocument marks the row "failed" on its own; surface a clean error.
-    console.error("Ingestion failed:", error)
+    // Catch-all for any unexpected error (DB down, missing API keys, pdf-parse
+    // crash, ingestion failure, etc.). Log the full error to the terminal and
+    // return a JSON 500 so the client never receives an HTML error page.
+    console.error(error)
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error during upload"
     return NextResponse.json(
-      { error: "שגיאה בעיבוד המסמך (Embedding/Pinecone)" },
+      { error: `שגיאה בעיבוד המסמך: ${message}` },
       { status: 500 }
     )
   }
