@@ -1,56 +1,112 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2 } from "lucide-react"
+import {
+  UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock,
+} from "lucide-react"
 
-// קוד הקורס מזהה את הקורס בצד השרת (מפת ל-courseId דרך Prisma)
-const COURSE_CODE = "matap1"
+type CourseInfo = {
+  id: string
+  courseCode: string
+  courseName: string
+  description: string | null
+}
 
-type UploadedDoc = { title: string; chunkCount: number }
+type CourseDocument = {
+  id: string
+  title: string
+  fileType: string | null
+  chunkCount: number
+  status: string
+  createdAt: string
+}
+
+type ChatMessage = { role: string; text: string }
+
+const STATUS_META: Record<string, { label: string; className: string }> = {
+  indexed: { label: "מאונדקס", className: "text-green-400" },
+  processing: { label: "מעבד", className: "text-[#d4af37]" },
+  pending: { label: "ממתין", className: "text-neutral-400" },
+  failed: { label: "נכשל", className: "text-red-400" },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const meta = STATUS_META[status] ?? { label: status, className: "text-neutral-400" }
+  const Icon =
+    status === "indexed" ? CheckCircle2 : status === "failed" ? AlertCircle : status === "processing" ? Loader2 : Clock
+  return (
+    <span className={`flex items-center gap-1 text-[10px] shrink-0 ${meta.className}`}>
+      <Icon size={12} className={status === "processing" ? "animate-spin" : ""} />
+      {meta.label}
+    </span>
+  )
+}
 
 export default function CoursePage() {
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "שלום! אני עוזר המחקר שלך לקורס מתפ 1. העלה חומרי לימוד, ואשמח לענות לך על כל שאלה במדויק מתוך החומר בלבד." }
+  // courseCode is read dynamically from the URL segment (no hardcoded constant).
+  const params = useParams<{ courseCode: string }>()
+  const courseCode = params.courseCode
+
+  const [course, setCourse] = useState<CourseInfo | null>(null)
+  const [documents, setDocuments] = useState<CourseDocument[]>([])
+  const [docsLoading, setDocsLoading] = useState(true)
+  const [docsError, setDocsError] = useState<string | null>(null)
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: "assistant", text: "שלום! אני עוזר המחקר שלך לקורס זה. העלה חומרי לימוד, ואשמח לענות לך על כל שאלה במדויק מתוך החומר בלבד." },
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  // Document ingestion state
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string | null>(null)
-  const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([])
+
+  // Load the course's display info + this user's previously uploaded documents.
+  const loadDocuments = useCallback(async () => {
+    if (!courseCode) return
+    try {
+      const res = await fetch(`/api/documents?courseCode=${encodeURIComponent(courseCode)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "טעינת המסמכים נכשלה")
+      setCourse(data.course)
+      setDocuments(data.documents)
+      setDocsError(null)
+    } catch (error) {
+      setDocsError(error instanceof Error ? error.message : "אירעה שגיאה")
+    } finally {
+      setDocsLoading(false)
+    }
+  }, [courseCode])
+
+  useEffect(() => {
+    loadDocuments()
+  }, [loadDocuments])
 
   const handleUpload = async (file: File) => {
     setIsUploading(true)
     setUploadStatus(`מעלה ומטמיע את "${file.name}"...`)
-
     try {
       const formData = new FormData()
       formData.append("file", file)
-      formData.append("courseCode", COURSE_CODE)
+      formData.append("courseCode", courseCode)
 
       const response = await fetch("/api/upload", { method: "POST", body: formData })
       const data = await response.json()
+      if (!response.ok) throw new Error(data?.error || "ההעלאה נכשלה")
 
-      if (!response.ok) {
-        throw new Error(data?.error || "ההעלאה נכשלה")
-      }
-
-      setUploadedDocs((prev) => [...prev, { title: data.title, chunkCount: data.chunkCount }])
       setUploadStatus(null)
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          text: `המסמך "${data.title}" נטען ונוסף לבסיס הידע (${data.chunkCount} קטעים). עכשיו אפשר לשאול עליו שאלות.`,
-        },
+        { role: "assistant", text: `המסמך "${data.title}" נטען ונוסף לבסיס הידע (${data.chunkCount} קטעים). עכשיו אפשר לשאול עליו שאלות.` },
       ])
+      await loadDocuments() // refresh the persistent list from the DB
     } catch (error) {
       setUploadStatus(error instanceof Error ? error.message : "אירעה שגיאה בהעלאת המסמך")
     } finally {
@@ -66,45 +122,31 @@ export default function CoursePage() {
 
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return
-
     const userMessage = { role: "user", text: input }
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
-
     try {
-      // קריאת ה-API האמיתית — מנוע ה-RAG (Pinecone + Gemini) בצד השרת
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          courseCode: COURSE_CODE,
-          sessionId, // שומר על רצף השיחה (conversational memory)
-        }),
+        body: JSON.stringify({ message: input, courseCode, sessionId }),
       })
-
       const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data?.error || "Request failed")
-      }
-
+      if (!response.ok) throw new Error(data?.error || "Request failed")
       if (data.sessionId) setSessionId(data.sessionId)
-
+      setMessages((prev) => [...prev, { role: "assistant", text: data.text || "לא התקבלה תשובה תקינה." }])
+    } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: data.text || "לא התקבלה תשובה תקינה." }
-      ])
-    } catch (error) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "מתקשה להתחבר לשרת ה-AI. ודא שהגדרת את המפתח נכון בקובץ .env.local" }
+        { role: "assistant", text: "מתקשה להתחבר לשרת ה-AI. ודא שהגדרת את המפתח נכון בקובץ .env.local" },
       ])
     } finally {
       setIsLoading(false)
     }
   }
+
+  const courseTitle = course?.courseName ?? courseCode
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col" dir="rtl">
@@ -123,8 +165,8 @@ export default function CoursePage() {
         {/* חלק ימין: חומרי לימוד */}
         <div className="space-y-6 flex flex-col">
           <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl p-6">
-            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#FFD700]">מתפ 1</h1>
-            <p className="text-neutral-400 text-sm mt-1">מבוא ללמידה וניתוח אלגוריתמים</p>
+            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#FFD700]">{courseTitle}</h1>
+            {course?.description && <p className="text-neutral-400 text-sm mt-1">{course.description}</p>}
           </div>
 
           <Card className="bg-[#141414] border-[#2a2a2a] text-white flex-1 flex flex-col">
@@ -155,10 +197,10 @@ export default function CoursePage() {
                   <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
                 )}
                 <span className="text-xs text-neutral-300 block">
-                  {isUploading ? "מעבד ומטמיע את המסמך..." : "לחץ להעלאת קובץ (PDF / TXT)"}
+                  {isUploading ? "מעבד ומטמיע את המסמך..." : "עכשיו אתה יכול להעלות חומרים"}
                 </span>
                 <span className="text-[10px] text-neutral-500 block mt-1">
-                  הקובץ ייחתך, יוטמע (Embeddings) ויאוחסן ב-Pinecone
+                  קובץ PDF / TXT — ייחתך, יוטמע (Embeddings) ויאוחסן ב-Pinecone
                 </span>
               </button>
 
@@ -167,22 +209,27 @@ export default function CoursePage() {
               )}
 
               <div className="space-y-2">
-                {uploadedDocs.length === 0 && !isUploading && (
+                {docsLoading ? (
+                  <p className="text-[11px] text-neutral-500 text-center flex items-center justify-center gap-1">
+                    <Loader2 size={12} className="animate-spin" /> טוען חומרים שהועלו...
+                  </p>
+                ) : docsError ? (
+                  <p className="text-[11px] text-red-400 text-center">{docsError}</p>
+                ) : documents.length === 0 ? (
                   <p className="text-[11px] text-neutral-500 text-center">עדיין לא הועלו חומרים לקורס זה.</p>
+                ) : (
+                  documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-2 p-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-xs text-neutral-300"
+                    >
+                      <FileText size={14} className="text-[#d4af37] shrink-0" />
+                      <span className="truncate flex-1">{doc.title}</span>
+                      <span className="text-[10px] text-neutral-500 shrink-0">{doc.chunkCount} קטעים</span>
+                      <StatusBadge status={doc.status} />
+                    </div>
+                  ))
                 )}
-                {uploadedDocs.map((doc, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 p-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-xs text-neutral-300"
-                  >
-                    <FileText size={14} className="text-[#d4af37] shrink-0" />
-                    <span className="truncate flex-1">{doc.title}</span>
-                    <span className="flex items-center gap-1 text-[10px] text-green-400 shrink-0">
-                      <CheckCircle2 size={12} />
-                      {doc.chunkCount} קטעים
-                    </span>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>
@@ -221,7 +268,7 @@ export default function CoursePage() {
             <div className="flex w-full gap-2 items-center">
               <Input
                 type="text"
-                placeholder="שאל אותי על חומר הלימוד של מתפ 1..."
+                placeholder={`שאל אותי על חומר הלימוד של ${courseTitle}...`}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}

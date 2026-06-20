@@ -1,11 +1,13 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { BookOpen, UploadCloud, FileText, PlayCircle } from "lucide-react"
+import { BookOpen, PlayCircle, Loader2, Sparkles } from "lucide-react"
+import { OnboardingModal } from "@/components/onboarding-modal"
 
 const barData = [
   { name: "שבוע 1", hours: 12 },
@@ -17,20 +19,52 @@ const barData = [
 
 const pieData = [
   { name: "נלמד", value: 70, color: "#d4af37" },
-  { name: "נותר ללמוד", value: 30, color: "#2a2a2a" }
+  { name: "נותר ללמוד", value: 30, color: "#2a2a2a" },
 ]
 
-const recentFiles = [
-  { name: "סיכום_MIPS_וקונבנציות.pdf", size: "2.4 MB", date: "היום" },
-  { name: "מצגת_C_Pointers.pdf", size: "1.1 MB", date: "אתמול" },
-]
+type Me = { onboardingCompleted: boolean; institution: string | null }
+
+type Enrollment = {
+  completionPercentage: number
+  course: { id: string; courseCode: string; courseName: string; description: string | null }
+}
 
 export default function Dashboard() {
   const { data: session } = useSession()
   const displayName = session?.user?.fullName || session?.user?.username || "אורח"
 
+  const [me, setMe] = useState<Me | null>(null)
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadData = useCallback(async () => {
+    try {
+      const [meRes, enrRes] = await Promise.all([fetch("/api/me"), fetch("/api/enrollments")])
+      if (meRes.ok) setMe(await meRes.json())
+      if (enrRes.ok) {
+        const data = await enrRes.json()
+        setEnrollments(data.enrollments ?? [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const handleOnboardingCompleted = () => {
+    setMe((prev) => (prev ? { ...prev, onboardingCompleted: true } : prev))
+    loadData() // refresh enrollments now that the user picked courses
+  }
+
+  const showOnboarding = !loading && me !== null && !me.onboardingCompleted
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 p-8" dir="rtl">
+      {showOnboarding && <OnboardingModal onCompleted={handleOnboardingCompleted} />}
+
       <div className="max-w-6xl mx-auto space-y-8">
 
         {/* כותרת הדשבורד */}
@@ -54,93 +88,50 @@ export default function Dashboard() {
             <BookOpen className="text-[#d4af37]" size={24} />
             הקורסים שלי
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            {/* קורס 1: מתפ 1 */}
-            <Card className="bg-[#141414] border-[#2a2a2a] hover:border-[#d4af37]/60 transition-colors">
-              <CardHeader>
-                <CardTitle className="text-xl text-white">מתפ 1</CardTitle>
-                <CardDescription className="text-neutral-400 mt-1">מבוא ללמידה וניתוח אלגוריתמים</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full bg-[#1f1f1f] rounded-full h-2.5 mt-2">
-                  <div className="bg-gradient-to-r from-[#d4af37] to-[#FFD700] h-2.5 rounded-full" style={{ width: '80%' }}></div>
-                </div>
-                <p className="text-xs text-neutral-500 mt-2 mb-4">הושלמו 80% ממטלות הקורס</p>
-                <div className="pt-4 border-t border-[#2a2a2a]">
-                  <Link href="/dashboard/matap1">
-                    <Button className="w-full bg-[#1f1f1f] hover:bg-[#d4af37] text-[#d4af37] hover:text-black border border-[#d4af37]/40 hover:border-[#d4af37] transition-colors flex items-center gap-2">
-                      <PlayCircle size={18} />
-                      היכנס ללמידה
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* קורס 2: מתפ 2 */}
-            <Card className="bg-[#141414] border-[#2a2a2a] hover:border-[#d4af37]/60 transition-colors">
-              <CardHeader>
-                <CardTitle className="text-xl text-white">מתפ 2</CardTitle>
-                <CardDescription className="text-neutral-400 mt-1">מערכות לומדות ורשתות נוירונים</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full bg-[#1f1f1f] rounded-full h-2.5 mt-2">
-                  <div className="bg-gradient-to-r from-[#d4af37] to-[#FFD700] h-2.5 rounded-full" style={{ width: '35%' }}></div>
-                </div>
-                <p className="text-xs text-neutral-500 mt-2 mb-4">הושלמו 35% ממטלות הקורס</p>
-                <div className="pt-4 border-t border-[#2a2a2a]">
-                  <Link href="/dashboard/matap2">
-                    <Button className="w-full bg-[#1f1f1f] hover:bg-[#d4af37] text-[#d4af37] hover:text-black border border-[#d4af37]/40 hover:border-[#d4af37] transition-colors flex items-center gap-2">
-                      <PlayCircle size={18} />
-                      היכנס ללמידה
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-
-          </div>
-        </section>
-
-        {/* אזור חומרי למידה והעלאה */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-              <UploadCloud className="text-[#d4af37]" size={24} />
-              העלאת חומרי למידה כלליים
-            </h2>
-            <div className="bg-[#141414]/60 border-2 border-dashed border-[#2a2a2a] hover:border-[#d4af37]/50 transition-colors rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer h-48">
-              <UploadCloud className="text-neutral-500 mb-4" size={40} />
-              <p className="text-neutral-300 font-medium">גרור קבצי PDF, מצגות או סיכומים לכאן</p>
-              <p className="text-neutral-500 text-sm mt-2 mb-4">או לחץ כדי לבחור קבצים מהמחשב</p>
-              <Button className="bg-[#d4af37] hover:bg-[#FFD700] text-black font-semibold">
-                בחר קבצים
-              </Button>
+          {loading ? (
+            <div className="flex items-center gap-2 text-neutral-400 py-8">
+              <Loader2 className="animate-spin text-[#d4af37]" size={20} />
+              טוען את הקורסים שלך...
             </div>
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-              <FileText className="text-[#d4af37]" size={24} />
-              חומרים שעובדו
-            </h2>
-            <Card className="bg-[#141414] border-[#2a2a2a] h-48 overflow-y-auto">
-              <CardContent className="p-4 space-y-4">
-                {recentFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded-lg border border-[#2a2a2a] hover:border-[#d4af37]/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <FileText className="text-[#d4af37]" size={20} />
-                      <div>
-                        <p className="text-sm font-medium text-neutral-200">{file.name}</p>
-                        <p className="text-xs text-neutral-500">{file.size} • נסרק {file.date}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          ) : enrollments.length === 0 ? (
+            <Card className="bg-[#141414] border-[#2a2a2a] border-dashed">
+              <CardContent className="py-10 text-center text-neutral-400">
+                <Sparkles className="mx-auto text-[#d4af37] mb-3" size={28} />
+                עדיין לא נרשמת לקורסים. השלם את ההרשמה כדי לפתוח את סביבת הלמידה.
               </CardContent>
             </Card>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {enrollments.map(({ course, completionPercentage }) => (
+                <Card key={course.id} className="bg-[#141414] border-[#2a2a2a] hover:border-[#d4af37]/60 transition-colors">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-white">{course.courseName}</CardTitle>
+                    {course.description && (
+                      <CardDescription className="text-neutral-400 mt-1">{course.description}</CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="w-full bg-[#1f1f1f] rounded-full h-2.5 mt-2">
+                      <div
+                        className="bg-gradient-to-r from-[#d4af37] to-[#FFD700] h-2.5 rounded-full"
+                        style={{ width: `${Math.round(completionPercentage)}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-neutral-500 mt-2 mb-4">הושלמו {Math.round(completionPercentage)}% ממטלות הקורס</p>
+                    <div className="pt-4 border-t border-[#2a2a2a]">
+                      <Link href={`/dashboard/${course.courseCode}`}>
+                        <Button className="w-full bg-[#1f1f1f] hover:bg-[#d4af37] text-[#d4af37] hover:text-black border border-[#d4af37]/40 hover:border-[#d4af37] transition-colors flex items-center gap-2">
+                          <PlayCircle size={18} />
+                          היכנס ללמידה
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* אזור הגרפים */}

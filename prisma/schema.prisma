@@ -64,6 +64,8 @@ model User {
   fullName         String?
   avatarUrl        String?
   role             String    @default("student")
+  institution         String?
+  onboardingCompleted Boolean   @default(false)
   moodleUserId     String?   @unique
   moodleAccessToken String?
   moodleRefreshToken String?
