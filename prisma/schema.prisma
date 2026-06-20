@@ -82,6 +82,8 @@ model User {
   learningSessions LearningSession[]
   chatHistory   ChatHistory[]
   vectorMetadata VectorMetadata[]
+  documents     Document[]
+  chatSessions  ChatSession[]
 
   @@index([email])
   @@index([username])
@@ -111,6 +113,8 @@ model Course {
   learningSessions LearningSession[]
   chatHistory      ChatHistory[]
   vectorMetadata   VectorMetadata[]
+  documents        Document[]
+  chatSessions     ChatSession[]
 
   @@index([courseCode])
   @@index([moodleCourseId])
@@ -261,4 +265,66 @@ model VectorMetadata {
   @@index([namespace])
   @@index([userId, courseId])
   @@map("vector_metadata")
+}
+
+// =====================================================
+// RAG Models (decoupled: relational only — vectors live in Pinecone)
+// =====================================================
+
+// Tracks an uploaded file. The chunk embeddings themselves are stored in
+// Pinecone (not here); this row records ingestion status and bookkeeping.
+model Document {
+  id                String   @id @default(cuid())
+  userId            String
+  courseId          String
+  title             String
+  fileType          String?
+  fileSizeBytes     BigInt?
+  status            String   @default("pending") // pending | processing | indexed | failed
+  chunkCount        Int      @default(0)
+  pineconeNamespace String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([userId, courseId])
+  @@map("documents")
+}
+
+// A course-specific conversation thread for a user.
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([userId, courseId])
+  @@map("chat_sessions")
+}
+
+// Exact message history for conversational memory.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String // "user" | "assistant" | "system"
+  content   String
+  createdAt DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("chat_messages")
 }
