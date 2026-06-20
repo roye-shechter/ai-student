@@ -6,6 +6,7 @@ import { useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { readJson } from "@/lib/http"
 import {
   UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock,
 } from "lucide-react"
@@ -99,19 +100,10 @@ export default function CoursePage() {
 
       const response = await fetch("/api/upload", { method: "POST", body: formData })
 
-      // The server can fail before our JSON handler runs (e.g. a crash) and
-      // return an HTML error page. Only parse JSON when it actually is JSON,
-      // so a bad response shows a clean message instead of crashing the UI.
-      const contentType = response.headers.get("content-type") || ""
-      let data: { error?: string; title?: string; chunkCount?: number } | null = null
-      if (contentType.includes("application/json")) {
-        try {
-          data = await response.json()
-        } catch {
-          data = null
-        }
-      }
-
+      // The server can fail before our JSON handler runs and return an HTML
+      // error page. readJson() returns null for non-JSON, so we surface the
+      // backend's error message (or a status-based one) instead of crashing.
+      const data = await readJson<{ error?: string; title?: string; chunkCount?: number }>(response)
       if (!response.ok || !data) {
         throw new Error(
           data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
@@ -149,15 +141,21 @@ export default function CoursePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: input, courseCode, sessionId }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data?.error || "Request failed")
+
+      // Guard against non-JSON (HTML error page) responses so a server crash
+      // surfaces the backend error instead of throwing "Unexpected token '<'".
+      const data = await readJson<{ text?: string; sessionId?: string; error?: string }>(response)
+      if (!response.ok || !data) {
+        throw new Error(
+          data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
+        )
+      }
+
       if (data.sessionId) setSessionId(data.sessionId)
       setMessages((prev) => [...prev, { role: "assistant", text: data.text || "לא התקבלה תשובה תקינה." }])
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "מתקשה להתחבר לשרת ה-AI. ודא שהגדרת את המפתח נכון בקובץ .env.local" },
-      ])
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "מתקשה להתחבר לשרת ה-AI."
+      setMessages((prev) => [...prev, { role: "assistant", text }])
     } finally {
       setIsLoading(false)
     }

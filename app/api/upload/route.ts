@@ -4,6 +4,7 @@ import { PDFParse } from "pdf-parse"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ingestDocument } from "@/lib/rag/ingest"
+import { assertEmbeddingEnv } from "@/lib/rag/clients"
 
 /**
  * Document ingestion endpoint.
@@ -57,6 +58,10 @@ export async function POST(req: Request) {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // 1b. Validate required keys up front (throws a precise, catchable error
+    //     naming the missing key — embedding + vector storage need these).
+    assertEmbeddingEnv()
 
     // 2. Read the multipart form.
     let form: FormData
@@ -149,9 +154,6 @@ export async function POST(req: Request) {
     console.error(error)
     const message =
       error instanceof Error ? error.message : "Unexpected server error during upload"
-    return NextResponse.json(
-      { error: `שגיאה בעיבוד המסמך: ${message}` },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

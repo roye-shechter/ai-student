@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { chat } from "@/lib/rag/chat"
+import { assertEmbeddingEnv, assertLlmEnv } from "@/lib/rag/clients"
 
 /**
  * Chat endpoint — drives the enterprise RAG pipeline (lib/rag/chat.ts):
@@ -24,46 +25,54 @@ type ChatRequestBody = {
 }
 
 export async function POST(req: Request) {
-  // 1. Authenticate — the user id is the hard tenancy key for retrieval.
-  const session = await getServerSession(authOptions)
-  const userId = session?.user?.id
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  // 2. Parse and validate the request.
-  let body: ChatRequestBody
+  // Everything runs inside one comprehensive try/catch so that ANY failure
+  // (missing env keys, DB errors, OpenAI/Pinecone/Gemini timeouts, etc.) is
+  // logged and returned as JSON — never Next's default HTML error page, which
+  // would break the client's response.json().
   try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
+    // 1. Authenticate — the user id is the hard tenancy key for retrieval.
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  const message = typeof body.message === "string" ? body.message.trim() : ""
-  if (!message) {
-    return NextResponse.json({ error: "message is required" }, { status: 400 })
-  }
+    // 2. Validate required keys up front (throws a precise, catchable error).
+    assertEmbeddingEnv()
+    assertLlmEnv()
 
-  // 3. Resolve the course. The UI identifies a course by its human courseCode
-  //    (e.g. "matap1"); a raw courseId is also accepted.
-  const courseId = typeof body.courseId === "string" ? body.courseId : undefined
-  const courseCode = typeof body.courseCode === "string" ? body.courseCode : undefined
+    // 3. Parse and validate the request.
+    let body: ChatRequestBody
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    }
 
-  const course = courseId
-    ? await prisma.course.findUnique({ where: { id: courseId } })
-    : courseCode
-      ? await prisma.course.findUnique({ where: { courseCode } })
-      : null
+    const message = typeof body.message === "string" ? body.message.trim() : ""
+    if (!message) {
+      return NextResponse.json({ error: "message is required" }, { status: 400 })
+    }
 
-  if (!course) {
-    return NextResponse.json(
-      { error: "Unknown course (provide a valid courseCode or courseId)" },
-      { status: 400 }
-    )
-  }
+    // 4. Resolve the course. The UI identifies a course by its human courseCode
+    //    (e.g. "matap1"); a raw courseId is also accepted.
+    const courseId = typeof body.courseId === "string" ? body.courseId : undefined
+    const courseCode = typeof body.courseCode === "string" ? body.courseCode : undefined
 
-  try {
-    // 4. Resolve the conversation thread. Reuse the supplied session if it
+    const course = courseId
+      ? await prisma.course.findUnique({ where: { id: courseId } })
+      : courseCode
+        ? await prisma.course.findUnique({ where: { courseCode } })
+        : null
+
+    if (!course) {
+      return NextResponse.json(
+        { error: "Unknown course (provide a valid courseCode or courseId)" },
+        { status: 400 }
+      )
+    }
+
+    // 5. Resolve the conversation thread. Reuse the supplied session if it
     //    belongs to this user+course, otherwise reuse the latest thread or
     //    open a new one.
     const requestedSessionId =
@@ -84,7 +93,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // 5. Run the full RAG turn.
+    // 6. Run the full RAG turn.
     const reply = await chat({
       userId,
       courseId: course.id,
@@ -99,10 +108,9 @@ export async function POST(req: Request) {
       sessionId: chatSession.id,
     })
   } catch (error) {
-    console.error("RAG chat error:", error)
-    return NextResponse.json(
-      { error: "שגיאה בתקשורת עם ה-AI" },
-      { status: 500 }
-    )
+    console.error(error)
+    const message =
+      error instanceof Error ? error.message : "Unexpected server error during chat"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

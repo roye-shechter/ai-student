@@ -73,3 +73,36 @@ export function namespaceForCourse(courseId: string): string {
 export function tenantFilter(userId: string, courseId: string) {
   return { userId: { $eq: userId }, courseId: { $eq: courseId } }
 }
+
+// =====================================================
+// Environment validation
+// =====================================================
+
+/**
+ * Return the value of a required environment variable, or throw a clear,
+ * catchable error naming exactly which key is missing. Treats empty/whitespace
+ * values as missing.
+ */
+export function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value || value.trim() === "") {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+  return value
+}
+
+/**
+ * Validate every key needed for embedding + vector storage (OpenAI + Pinecone).
+ * Call at the start of any ingestion/retrieval path so a missing key fails
+ * fast with a precise message instead of an opaque downstream error.
+ */
+export function assertEmbeddingEnv(): void {
+  requireEnv("OPENAI_API_KEY")
+  requireEnv("PINECONE_API_KEY")
+  requireEnv("PINECONE_INDEX")
+}
+
+/** Validate the key needed for the chat LLM (Gemini). */
+export function assertLlmEnv(): void {
+  requireEnv("GEMINI_API_KEY")
+}

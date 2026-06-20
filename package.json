@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:errors": "tsx scripts/test-error-handling.mjs",
     "postinstall": "prisma generate"
   },
   "prisma": {

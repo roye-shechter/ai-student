@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import {
+  assertEmbeddingEnv,
   EMBEDDING_MODEL,
   getIndex,
   getOpenAI,
@@ -153,6 +154,9 @@ export type IngestResult = {
  * exist (created when the file is uploaded).
  */
 export async function ingestDocument(params: IngestParams): Promise<IngestResult> {
+  // Fail fast with a precise message if any embedding/vector key is missing.
+  assertEmbeddingEnv()
+
   const { userId, courseId, documentId, text, chunkOptions } = params
   const namespace = namespaceForCourse(courseId)
 

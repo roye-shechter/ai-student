@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { prisma } from "@/lib/prisma"
 import {
+  assertEmbeddingEnv,
+  assertLlmEnv,
   EMBEDDING_MODEL,
   getIndex,
   getOpenAI,
   namespaceForCourse,
+  requireEnv,
   tenantFilter,
 } from "./clients"
 
@@ -139,6 +142,11 @@ export type ChatReply = {
  * `sessionId` must reference a ChatSession that belongs to (userId, courseId).
  */
 export async function chat(params: ChatParams): Promise<ChatReply> {
+  // Fail fast with a precise message if any required key is missing
+  // (OpenAI + Pinecone for retrieval, Gemini for the answer).
+  assertEmbeddingEnv()
+  assertLlmEnv()
+
   const { userId, courseId, sessionId, message, topK, historyLimit } = params
 
   const [chunks, history] = await Promise.all([
@@ -148,7 +156,7 @@ export async function chat(params: ChatParams): Promise<ChatReply> {
 
   const prompt = buildPrompt({ chunks, history, query: message })
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+  const genAI = new GoogleGenerativeAI(requireEnv("GEMINI_API_KEY"))
   const model = genAI.getGenerativeModel({
     model: LLM_MODEL,
     systemInstruction: SYSTEM_INSTRUCTION,
