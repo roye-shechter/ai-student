@@ -108,7 +108,7 @@ export async function POST(req: Request) {
       sessionId: chatSession.id,
     })
   } catch (error) {
-    console.error(error)
+    console.error("[CRITICAL_ERROR] Route /api/chat failed:", error)
     const message =
       error instanceof Error ? error.message : "Unexpected server error during chat"
     return NextResponse.json({ error: message }, { status: 500 })

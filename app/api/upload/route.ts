@@ -151,7 +151,7 @@ export async function POST(req: Request) {
     // Catch-all for any unexpected error (DB down, missing API keys, pdf-parse
     // crash, ingestion failure, etc.). Log the full error to the terminal and
     // return a JSON 500 so the client never receives an HTML error page.
-    console.error(error)
+    console.error("[CRITICAL_ERROR] Route /api/upload failed:", error)
     const message =
       error instanceof Error ? error.message : "Unexpected server error during upload"
     return NextResponse.json({ error: message }, { status: 500 })

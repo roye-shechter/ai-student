@@ -74,10 +74,14 @@ export default function CoursePage() {
     if (!courseCode) return
     try {
       const res = await fetch(`/api/documents?courseCode=${encodeURIComponent(courseCode)}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || "טעינת המסמכים נכשלה")
-      setCourse(data.course)
-      setDocuments(data.documents)
+      // Guard against non-JSON (HTML error page) responses so a server crash
+      // surfaces a clean message instead of throwing "Unexpected token '<'".
+      const data = await readJson<{ course?: CourseInfo; documents?: CourseDocument[]; error?: string }>(res)
+      if (!res.ok || !data) {
+        throw new Error(data?.error || `טעינת המסמכים נכשלה (קוד ${res.status})`)
+      }
+      setCourse(data.course ?? null)
+      setDocuments(data.documents ?? [])
       setDocsError(null)
     } catch (error) {
       setDocsError(error instanceof Error ? error.message : "אירעה שגיאה")
