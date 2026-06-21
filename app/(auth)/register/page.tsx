@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { readJson } from "@/lib/http"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -54,16 +55,18 @@ export default function RegisterPage() {
         }),
       })
 
-      const data = await response.json()
+      // Guard against non-JSON (HTML error page) responses so a server crash
+      // surfaces the backend message instead of throwing "Unexpected token '<'".
+      const data = await readJson<{ error?: string }>(response)
 
-      if (!response.ok) {
-        setError(data.error || "אירעה שגיאה בהרשמה")
+      if (!response.ok || !data) {
+        setError(data?.error || `אירעה שגיאה בהרשמה (קוד ${response.status})`)
         return
       }
 
       // Registration successful, redirect to login
       router.push("/?registered=true")
-    } catch (err) {
+    } catch {
       setError("אירעה שגיאה בהרשמה")
     } finally {
       setIsLoading(false)
