@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
-import { PDFParse } from "pdf-parse"
+import PDFParser, { type Output } from "pdf2json"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ingestDocument } from "@/lib/rag/ingest"
@@ -16,7 +16,7 @@ import { assertEmbeddingEnv } from "@/lib/rag/clients"
  * authenticated userId + the resolved courseId for strict tenant isolation.
  */
 
-// pdf-parse / pdfjs-dist require the Node.js runtime (not edge).
+// pdf2json requires the Node.js runtime (node:stream / Buffer) — not edge.
 export const runtime = "nodejs"
 
 const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -31,19 +31,43 @@ function isTxt(file: File): boolean {
   return TXT_TYPES.includes(file.type) || file.name.toLowerCase().endsWith(".txt")
 }
 
-/** Extract plain text from a PDF buffer using pdf-parse (pdfjs under the hood). */
-async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  const parser = new PDFParse({ data: bytes })
+/** decodeURIComponent that never throws on malformed/partial escape sequences. */
+function safeDecode(value: string): string {
   try {
-    const result = await parser.getText()
-    // Join clean per-page text; result.text adds "-- N of M --" dividers that
-    // would otherwise be embedded as noise.
-    return result.pages.length
-      ? result.pages.map((page) => page.text).join("\n\n")
-      : result.text
-  } finally {
-    await parser.destroy()
+    return decodeURIComponent(value)
+  } catch {
+    return value
   }
+}
+
+/**
+ * Extract plain text from a PDF buffer using pdf2json — a pure-JS parser with
+ * no native/canvas dependencies, so it runs cleanly in Vercel's serverless
+ * containers. (pdf-parse pulled in pdfjs-dist, which crashed trying to load the
+ * native @napi-rs/canvas binary that doesn't exist in the Vercel image.)
+ *
+ * pdf2json is event-based, so we wrap it in a Promise and assemble clean
+ * per-page text from the decoded text runs (avoiding the page-break divider
+ * markers that getRawTextContent() would inject).
+ */
+function extractPdfText(bytes: Uint8Array): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const parser = new PDFParser(null, true)
+
+    parser.on("pdfParser_dataError", (err) => {
+      const message = err instanceof Error ? err.message : err.parserError.message
+      reject(new Error(message || "Failed to parse PDF"))
+    })
+
+    parser.on("pdfParser_dataReady", (data: Output) => {
+      const text = data.Pages.map((page) =>
+        page.Texts.map((t) => t.R.map((run) => safeDecode(run.T)).join("")).join(" ")
+      ).join("\n\n")
+      resolve(text)
+    })
+
+    parser.parseBuffer(Buffer.from(bytes))
+  })
 }
 
 export async function POST(req: Request) {
