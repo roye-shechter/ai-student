@@ -26,11 +26,30 @@ const DEFAULT_TOP_K = 5
 const DEFAULT_HISTORY_LIMIT = 10
 const LLM_MODEL = "gemini-2.5-flash"
 
-const SYSTEM_INSTRUCTION =
-  "אתה עוזר הוראה אקדמי קפדן ודייקן. ענה על שאלת הסטודנט אך ורק על בסיס קטעי " +
-  "חומרי הלימוד (Context) והיסטוריית השיחה המצורפים. אם התשובה אינה נמצאת באופן " +
-  "מפורש או משתמע ישירות מהחומר המצורף, ענה במילים האלו בדיוק: " +
-  "'המידע אינו מופיע בחומרי הלימוד של הקורס'. אל תמציא עובדות ואל תשתמש בידע חיצוני."
+/**
+ * Build the Gemini system instruction. Establishes a warm "private tutor"
+ * persona (greeting the student by name), enforces strict Markdown formatting
+ * so answers never come back as one unreadable wall of text, and — critically —
+ * preserves the hard RAG grounding rule: only answer from the supplied course
+ * material, never from outside knowledge.
+ */
+function buildSystemInstruction(userName: string): string {
+  return [
+    `אתה מורה פרטי אוניברסיטאי מומחה, סבלני ומעודד. שם הסטודנט הוא ${userName}.`,
+    `בתחילת השיחה (כאשר עדיין אין היסטוריית שיחה) פתח תמיד בברכה אישית — לדוגמה: "שלום ${userName}," — ורק לאחר מכן ענה לגופו של עניין.`,
+    "",
+    "כללי בסיס (קפדניים — אסור לחרוג מהם):",
+    "- ענה אך ורק על בסיס קטעי חומרי הלימוד (Context) והיסטוריית השיחה המצורפים. אל תמציא עובדות ואל תשתמש בידע חיצוני.",
+    "- אם התשובה אינה מופיעה במפורש או אינה נובעת ישירות מהחומר המצורף, ענה במילים האלו בדיוק: 'המידע אינו מופיע בחומרי הלימוד של הקורס'.",
+    "- ענה תמיד בעברית.",
+    "",
+    "כללי עיצוב (חובה):",
+    "- לעולם אל תחזיר 'קיר טקסט' ארוך ורציף.",
+    "- חובה להשתמש בעיצוב Markdown עשיר: חלק את התשובה לפסקאות קצרות, השתמש ברשימות תבליטים (bullet points) לרשימות, הדגש מונחים ומושגי מפתח ב-**הדגשה**, והשתמש בכותרות היררכיות ברורות (## / ###).",
+    "- ארגן תשובות ארוכות בסעיפים עם כותרות, כך שיהיה קל לקרוא ולסרוק אותן.",
+    "- שמור על טון מעודד, ידידותי וברור, כיאה למורה פרטי תומך.",
+  ].join("\n")
+}
 
 export type RetrievedChunk = {
   text: string
@@ -125,6 +144,7 @@ export function buildPrompt(args: {
 
 export type ChatParams = {
   userId: string
+  userName: string
   courseId: string
   sessionId: string
   message: string
@@ -147,7 +167,7 @@ export async function chat(params: ChatParams): Promise<ChatReply> {
   assertEmbeddingEnv()
   assertLlmEnv()
 
-  const { userId, courseId, sessionId, message, topK, historyLimit } = params
+  const { userId, userName, courseId, sessionId, message, topK, historyLimit } = params
 
   const [chunks, history] = await Promise.all([
     retrieveContext({ userId, courseId, query: message, topK }),
@@ -159,7 +179,7 @@ export async function chat(params: ChatParams): Promise<ChatReply> {
   const genAI = new GoogleGenerativeAI(requireEnv("GEMINI_API_KEY"))
   const model = genAI.getGenerativeModel({
     model: LLM_MODEL,
-    systemInstruction: SYSTEM_INSTRUCTION,
+    systemInstruction: buildSystemInstruction(userName),
   })
   const result = await model.generateContent(prompt)
   const answer = result.response.text()

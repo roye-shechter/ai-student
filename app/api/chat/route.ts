@@ -37,6 +37,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // The tutor persona greets the student by name. Prefer the full name, fall
+    // back to the username, then to a neutral Hebrew default.
+    const userName = session?.user?.fullName || session?.user?.username || "סטודנט"
+
     // 2. Validate required keys up front (throws a precise, catchable error).
     assertEmbeddingEnv()
     assertLlmEnv()
@@ -96,6 +100,7 @@ export async function POST(req: Request) {
     // 6. Run the full RAG turn.
     const reply = await chat({
       userId,
+      userName,
       courseId: course.id,
       sessionId: chatSession.id,
       message,

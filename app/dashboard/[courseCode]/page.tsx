@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
+import { MarkdownMessage } from "@/components/markdown-message"
 import {
   UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock,
 } from "lucide-react"
@@ -271,7 +272,7 @@ export default function CoursePage() {
                   {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
                 </div>
                 <div className={`p-3 rounded-xl text-sm leading-relaxed ${msg.role === "user" ? "bg-[#d4af37] text-black rounded-tl-none text-left" : "bg-[#1f1f1f] text-neutral-100 rounded-tr-none"}`}>
-                  {msg.text}
+                  {msg.role === "user" ? msg.text : <MarkdownMessage content={msg.text} />}
                 </div>
               </div>
             ))}
