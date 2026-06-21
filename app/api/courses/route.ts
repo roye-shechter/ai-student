@@ -77,32 +77,40 @@ export async function POST(req: Request) {
 
     const { courseName, credits } = parsed
 
-    // Create the course (tagged with its creator) and enroll the creator in a
-    // single transaction so we never leave an orphaned, un-enrolled course.
-    const course = await prisma.$transaction(async (tx) => {
-      const created = await tx.course.create({
-        data: {
-          courseCode: buildCourseCode(courseName),
-          courseName,
-          credits,
-          creatorId: userId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          courseCode: true,
-          courseName: true,
-          description: true,
-          credits: true,
-        },
-      })
-
-      await tx.enrollment.create({
-        data: { userId, courseId: created.id, isActive: true },
-      })
-
-      return created
+    // Sequential writes instead of an interactive ($transaction) transaction.
+    // On a Neon serverless cold start the DB can take several seconds to wake
+    // up, which blows past Prisma's transaction-start window and surfaces as
+    // "Unable to start a transaction in the given time". Strict ACID isn't
+    // critical for this flow, so we create the course then the enrollment as
+    // independent calls. If the enrollment fails we best-effort delete the
+    // course so we never leave an orphaned, un-enrolled row.
+    const course = await prisma.course.create({
+      data: {
+        courseCode: buildCourseCode(courseName),
+        courseName,
+        credits,
+        creatorId: userId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        courseCode: true,
+        courseName: true,
+        description: true,
+        credits: true,
+      },
     })
+
+    try {
+      await prisma.enrollment.create({
+        data: { userId, courseId: course.id, isActive: true },
+      })
+    } catch (enrollError) {
+      console.error("[CRITICAL_ERROR] Enrollment after course creation failed:", enrollError)
+      // Roll back the orphaned course (best effort — don't mask the real error).
+      await prisma.course.delete({ where: { id: course.id } }).catch(() => {})
+      throw enrollError
+    }
 
     return NextResponse.json({ course }, { status: 201 })
   } catch (error) {
