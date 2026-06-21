@@ -22,6 +22,7 @@ export async function GET() {
           courseCode: true,
           courseName: true,
           description: true,
+          credits: true,
         },
       },
     },

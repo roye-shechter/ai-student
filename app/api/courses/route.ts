@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
+import { randomUUID } from "crypto"
+import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+
+// crypto.randomUUID needs the Node.js runtime (not edge).
+export const runtime = "nodejs"
 
 /** All active courses available to enroll in (for the onboarding picker). */
 export async function GET() {
@@ -18,9 +23,92 @@ export async function GET() {
       courseCode: true,
       courseName: true,
       description: true,
+      credits: true,
       instructorName: true,
     },
   })
 
   return NextResponse.json({ courses })
+}
+
+const createCourseSchema = z.object({
+  courseName: z.string().trim().min(1, "Course name is required").max(120),
+  credits: z.coerce.number().min(0, "Credits cannot be negative").max(100).default(0),
+})
+
+/**
+ * Slugify a (possibly Hebrew) course name into an ASCII-safe base for the
+ * unique courseCode. Latin letters/digits are kept; everything else (Hebrew,
+ * spaces, punctuation) becomes a hyphen. A short random suffix guarantees
+ * uniqueness even when the slug base is empty (e.g. a purely Hebrew name).
+ */
+function buildCourseCode(courseName: string): string {
+  const base = courseName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32)
+  const suffix = randomUUID().slice(0, 8)
+  return base ? `${base}-${suffix}` : `course-${suffix}`
+}
+
+/**
+ * Create a user-generated course and immediately enroll its creator.
+ *
+ * Wrapped in one try/catch so any failure (DB down, slug collision, etc.) is
+ * returned as JSON rather than Next's default HTML error page.
+ */
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let parsed: z.infer<typeof createCourseSchema>
+    try {
+      parsed = createCourseSchema.parse(await req.json())
+    } catch (error) {
+      const message =
+        error instanceof z.ZodError ? error.issues[0].message : "Invalid request body"
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+
+    const { courseName, credits } = parsed
+
+    // Create the course (tagged with its creator) and enroll the creator in a
+    // single transaction so we never leave an orphaned, un-enrolled course.
+    const course = await prisma.$transaction(async (tx) => {
+      const created = await tx.course.create({
+        data: {
+          courseCode: buildCourseCode(courseName),
+          courseName,
+          credits,
+          creatorId: userId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          courseCode: true,
+          courseName: true,
+          description: true,
+          credits: true,
+        },
+      })
+
+      await tx.enrollment.create({
+        data: { userId, courseId: created.id, isActive: true },
+      })
+
+      return created
+    })
+
+    return NextResponse.json({ course }, { status: 201 })
+  } catch (error) {
+    console.error("[CRITICAL_ERROR] Route /api/courses (POST) failed:", error)
+    const message =
+      error instanceof Error ? error.message : "Failed to create course"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

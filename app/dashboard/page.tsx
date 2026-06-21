@@ -6,8 +6,10 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { BookOpen, PlayCircle, Loader2, Sparkles } from "lucide-react"
+import { BookOpen, PlayCircle, Loader2, Sparkles, Plus, Award } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
+import { CreateCourseDialog } from "@/components/create-course-dialog"
+import { readJson } from "@/lib/http"
 
 const barData = [
   { name: "שבוע 1", hours: 12 },
@@ -26,7 +28,7 @@ type Me = { onboardingCompleted: boolean; institution: string | null }
 
 type Enrollment = {
   completionPercentage: number
-  course: { id: string; courseCode: string; courseName: string; description: string | null }
+  course: { id: string; courseCode: string; courseName: string; description: string | null; credits: number }
 }
 
 export default function Dashboard() {
@@ -36,15 +38,15 @@ export default function Dashboard() {
   const [me, setMe] = useState<Me | null>(null)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCreateCourse, setShowCreateCourse] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
       const [meRes, enrRes] = await Promise.all([fetch("/api/me"), fetch("/api/enrollments")])
-      if (meRes.ok) setMe(await meRes.json())
-      if (enrRes.ok) {
-        const data = await enrRes.json()
-        setEnrollments(data.enrollments ?? [])
-      }
+      const meData = await readJson<Me>(meRes)
+      if (meRes.ok && meData) setMe(meData)
+      const enrData = await readJson<{ enrollments?: Enrollment[] }>(enrRes)
+      if (enrRes.ok && enrData) setEnrollments(enrData.enrollments ?? [])
     } finally {
       setLoading(false)
     }
@@ -56,7 +58,12 @@ export default function Dashboard() {
 
   const handleOnboardingCompleted = () => {
     setMe((prev) => (prev ? { ...prev, onboardingCompleted: true } : prev))
-    loadData() // refresh enrollments now that the user picked courses
+    loadData()
+  }
+
+  const handleCourseCreated = () => {
+    setShowCreateCourse(false)
+    loadData() // refresh the active enrollments list with the new course
   }
 
   const showOnboarding = !loading && me !== null && !me.onboardingCompleted
@@ -64,6 +71,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-100 p-8" dir="rtl">
       {showOnboarding && <OnboardingModal onCompleted={handleOnboardingCompleted} />}
+      {showCreateCourse && (
+        <CreateCourseDialog onClose={() => setShowCreateCourse(false)} onCreated={handleCourseCreated} />
+      )}
 
       <div className="max-w-6xl mx-auto space-y-8">
 
@@ -84,10 +94,19 @@ export default function Dashboard() {
 
         {/* אזור הקורסים שלי */}
         <section>
-          <h2 className="text-2xl font-semibold text-neutral-200 mb-4 flex items-center gap-2">
-            <BookOpen className="text-[#d4af37]" size={24} />
-            הקורסים שלי
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold text-neutral-200 flex items-center gap-2">
+              <BookOpen className="text-[#d4af37]" size={24} />
+              הקורסים שלי
+            </h2>
+            <Button
+              onClick={() => setShowCreateCourse(true)}
+              className="bg-[#d4af37] hover:bg-[#FFD700] text-black font-semibold flex items-center gap-2"
+            >
+              <Plus size={18} />
+              הוסף קורס חדש
+            </Button>
+          </div>
 
           {loading ? (
             <div className="flex items-center gap-2 text-neutral-400 py-8">
@@ -98,7 +117,14 @@ export default function Dashboard() {
             <Card className="bg-[#141414] border-[#2a2a2a] border-dashed">
               <CardContent className="py-10 text-center text-neutral-400">
                 <Sparkles className="mx-auto text-[#d4af37] mb-3" size={28} />
-                עדיין לא נרשמת לקורסים. השלם את ההרשמה כדי לפתוח את סביבת הלמידה.
+                <p className="mb-4">עדיין אין לך קורסים. צור את הקורס הראשון שלך כדי לפתוח את סביבת הלמידה.</p>
+                <Button
+                  onClick={() => setShowCreateCourse(true)}
+                  className="bg-[#d4af37] hover:bg-[#FFD700] text-black font-semibold inline-flex items-center gap-2"
+                >
+                  <Plus size={18} />
+                  הוסף קורס חדש
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -106,7 +132,13 @@ export default function Dashboard() {
               {enrollments.map(({ course, completionPercentage }) => (
                 <Card key={course.id} className="bg-[#141414] border-[#2a2a2a] hover:border-[#d4af37]/60 transition-colors">
                   <CardHeader>
-                    <CardTitle className="text-xl text-white">{course.courseName}</CardTitle>
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-xl text-white">{course.courseName}</CardTitle>
+                      <span className="flex items-center gap-1 text-xs text-[#d4af37] bg-[#2a2410] border border-[#d4af37]/40 px-2 py-1 rounded shrink-0">
+                        <Award size={12} />
+                        {course.credits} נ&quot;ז
+                      </span>
+                    </div>
                     {course.description && (
                       <CardDescription className="text-neutral-400 mt-1">{course.description}</CardDescription>
                     )}

@@ -1,59 +1,28 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Loader2, GraduationCap, CheckCircle2 } from "lucide-react"
+import { useState } from "react"
+import { Loader2, GraduationCap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { readJson } from "@/lib/http"
 
-type Course = {
-  id: string
-  courseCode: string
-  courseName: string
-  description: string | null
-}
+// Common Israeli academic study-year options.
+const STUDY_YEARS = ["שנה א'", "שנה ב'", "שנה ג'", "שנה ד'", "תואר שני", "תואר שלישי"]
 
 /**
  * Forced onboarding modal. Rendered (and held open) by the dashboard whenever
  * the user's onboardingCompleted flag is false. Collects the academic
- * institution and the courses to unlock, then persists both via /api/onboarding.
+ * institution and the year of study, then persists both via /api/onboarding.
+ * Courses are no longer picked here — users create their own from the dashboard.
  */
 export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
-  const [courses, setCourses] = useState<Course[]>([])
-  const [coursesLoading, setCoursesLoading] = useState(true)
   const [institution, setInstitution] = useState("")
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [studyYear, setStudyYear] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let active = true
-    fetch("/api/courses")
-      .then((res) => res.json())
-      .then((data) => {
-        if (active) setCourses(data.courses ?? [])
-      })
-      .catch(() => {
-        if (active) setError("טעינת רשימת הקורסים נכשלה")
-      })
-      .finally(() => {
-        if (active) setCoursesLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const toggleCourse = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const canSubmit = institution.trim().length > 0 && selected.size > 0 && !submitting
+  const canSubmit = institution.trim().length > 0 && studyYear.trim().length > 0 && !submitting
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -63,10 +32,12 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ institution: institution.trim(), courseIds: [...selected] }),
+        body: JSON.stringify({ institution: institution.trim(), studyYear: studyYear.trim() }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || "שמירת הפרטים נכשלה")
+      const data = await readJson<{ error?: string }>(res)
+      if (!res.ok || !data) {
+        throw new Error(data?.error || `שמירת הפרטים נכשלה (קוד ${res.status})`)
+      }
       onCompleted()
     } catch (err) {
       setError(err instanceof Error ? err.message : "אירעה שגיאה")
@@ -98,44 +69,18 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-neutral-200">בחר את הקורסים שלך</Label>
-            {coursesLoading ? (
-              <p className="text-sm text-neutral-500 flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" /> טוען קורסים זמינים...
-              </p>
-            ) : courses.length === 0 ? (
-              <p className="text-sm text-neutral-500">לא נמצאו קורסים זמינים.</p>
-            ) : (
-              <div className="space-y-2">
-                {courses.map((course) => {
-                  const isChecked = selected.has(course.id)
-                  return (
-                    <label
-                      key={course.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                        isChecked
-                          ? "border-[#d4af37] bg-[#2a2410]/40"
-                          : "border-[#2a2a2a] bg-[#0a0a0a] hover:border-[#d4af37]/50"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleCourse(course.id)}
-                        className="mt-1 h-4 w-4 accent-[#d4af37]"
-                      />
-                      <span className="flex-1">
-                        <span className="block text-sm font-medium text-neutral-100">{course.courseName}</span>
-                        {course.description && (
-                          <span className="block text-xs text-neutral-500 mt-0.5">{course.description}</span>
-                        )}
-                      </span>
-                      {isChecked && <CheckCircle2 size={16} className="text-[#d4af37] shrink-0 mt-0.5" />}
-                    </label>
-                  )
-                })}
-              </div>
-            )}
+            <Label htmlFor="studyYear" className="text-neutral-200">שנת לימוד</Label>
+            <select
+              id="studyYear"
+              value={studyYear}
+              onChange={(e) => setStudyYear(e.target.value)}
+              className="w-full h-10 rounded-md bg-[#1f1f1f] border border-[#2a2a2a] text-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37]"
+            >
+              <option value="" disabled>בחר את שנת הלימוד שלך</option>
+              {STUDY_YEARS.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
