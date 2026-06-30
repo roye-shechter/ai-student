@@ -28,7 +28,7 @@ function test(name, fn) {
     })
 }
 
-const ENV_KEYS = ["OPENAI_API_KEY", "PINECONE_API_KEY", "PINECONE_INDEX", "GEMINI_API_KEY"]
+const ENV_KEYS = ["OPENAI_API_KEY", "PINECONE_API_KEY", "PINECONE_INDEX", "ANTHROPIC_API_KEY"]
 const clearKeys = () => ENV_KEYS.forEach((k) => delete process.env[k])
 const setAll = () => ENV_KEYS.forEach((k) => (process.env[k] = "test-value"))
 
@@ -50,10 +50,10 @@ await test("assertEmbeddingEnv flags PINECONE_API_KEY when only it is missing", 
   delete process.env.PINECONE_API_KEY
   assert.throws(() => assertEmbeddingEnv(), /PINECONE_API_KEY/)
 })
-await test("assertLlmEnv flags GEMINI_API_KEY when missing", () => {
+await test("assertLlmEnv flags ANTHROPIC_API_KEY when missing", () => {
   setAll()
-  delete process.env.GEMINI_API_KEY
-  assert.throws(() => assertLlmEnv(), /GEMINI_API_KEY/)
+  delete process.env.ANTHROPIC_API_KEY
+  assert.throws(() => assertLlmEnv(), /ANTHROPIC_API_KEY/)
 })
 await test("asserts pass when every key is present", () => {
   setAll()

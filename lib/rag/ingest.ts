@@ -138,6 +138,10 @@ export type IngestParams = {
   userId: string
   courseId: string
   documentId: string
+  /** Original upload filename, stored on every chunk's metadata. */
+  fileName: string
+  /** Upload time as epoch milliseconds, stored on every chunk's metadata. */
+  uploadTimestamp: number
   text: string
   chunkOptions?: ChunkOptions
 }
@@ -157,7 +161,7 @@ export async function ingestDocument(params: IngestParams): Promise<IngestResult
   // Fail fast with a precise message if any embedding/vector key is missing.
   assertEmbeddingEnv()
 
-  const { userId, courseId, documentId, text, chunkOptions } = params
+  const { userId, courseId, documentId, fileName, uploadTimestamp, text, chunkOptions } = params
   const namespace = namespaceForCourse(courseId)
 
   await prisma.document.update({
@@ -178,6 +182,8 @@ export async function ingestDocument(params: IngestParams): Promise<IngestResult
         documentId,
         chunkIndex: i,
         text: chunk,
+        fileName,
+        uploadTimestamp,
       } satisfies ChunkMetadata,
     }))
 

@@ -1,13 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import type Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/prisma"
 import {
   assertEmbeddingEnv,
   assertLlmEnv,
+  CHAT_MODEL,
   EMBEDDING_MODEL,
+  getAnthropic,
   getIndex,
   getOpenAI,
   namespaceForCourse,
-  requireEnv,
   tenantFilter,
 } from "./clients"
 
@@ -18,18 +19,20 @@ import {
  * 2. Query Pinecone for the course namespace, filtered strictly by
  *    { userId, courseId } so a tenant only ever sees their own chunks.
  * 3. Load recent ChatMessage history from Postgres (conversational memory).
- * 4. Assemble a structured prompt and answer with the LLM (Gemini).
+ * 4. Assemble a structured prompt and answer with the LLM (Anthropic Claude).
  * 5. Persist the user + assistant turns back to Postgres.
  */
 
 const DEFAULT_TOP_K = 5
 const DEFAULT_HISTORY_LIMIT = 10
-const LLM_MODEL = "gemini-2.5-flash"
+const MAX_OUTPUT_TOKENS = 4096
 
 /**
- * Build the Gemini system instruction. Establishes a warm "private tutor"
+ * Build the Claude system instruction. Establishes a warm "private tutor"
  * persona (greeting the student by name), enforces strict Markdown formatting
- * so answers never come back as one unreadable wall of text, and — critically —
+ * so answers never come back as one unreadable wall of text, teaches the model
+ * to use the per-chunk source metadata (file name + upload time) so it can
+ * answer file-specific or chronological-order questions, and — critically —
  * preserves the hard RAG grounding rule: only answer from the supplied course
  * material, never from outside knowledge.
  */
@@ -42,6 +45,11 @@ function buildSystemInstruction(userName: string): string {
     "- ענה אך ורק על בסיס קטעי חומרי הלימוד (Context) והיסטוריית השיחה המצורפים. אל תמציא עובדות ואל תשתמש בידע חיצוני.",
     "- אם התשובה אינה מופיעה במפורש או אינה נובעת ישירות מהחומר המצורף, ענה במילים האלו בדיוק: 'המידע אינו מופיע בחומרי הלימוד של הקורס'.",
     "- ענה תמיד בעברית.",
+    "",
+    "מטא-דאטה של מקורות (חשוב):",
+    "- כל קטע בהקשר (Context) מסומן בשורת מקור בפורמט [Source File: שם הקובץ, Uploaded At: זמן ההעלאה] ואחריה הטקסט עצמו.",
+    "- הסטודנט עשוי לשאול שאלות על קובץ מסוים (לדוגמה: \"על בסיס הקובץ 'math_summary.pdf'...\") או לבקש לעבור על החומר לפי סדר ההעלאה הכרונולוגי.",
+    "- השתמש בשדות [Source File] ו-[Uploaded At] כדי לענות על בקשות כאלה בדייקנות, ולפי סדר זמני העלאה כשמתבקש. ציין את שם הקובץ בתשובה כאשר הדבר מסייע.",
     "",
     "כללי עיצוב (חובה):",
     "- לעולם אל תחזיר 'קיר טקסט' ארוך ורציף.",
@@ -56,6 +64,8 @@ export type RetrievedChunk = {
   score: number
   documentId: string
   chunkIndex: number
+  fileName: string
+  uploadTimestamp: number
 }
 
 export type ChatTurn = {
@@ -97,6 +107,8 @@ export async function retrieveContext(args: {
     score: match.score ?? 0,
     documentId: match.metadata?.documentId ?? "",
     chunkIndex: match.metadata?.chunkIndex ?? 0,
+    fileName: match.metadata?.fileName ?? "",
+    uploadTimestamp: match.metadata?.uploadTimestamp ?? 0,
   }))
 }
 
@@ -122,8 +134,18 @@ export function buildPrompt(args: {
 }): string {
   const { chunks, history, query } = args
 
+  // Prefix every chunk with its source metadata so the model can answer
+  // file-specific questions and reason about chronological upload order.
   const contextBlock = chunks.length
-    ? chunks.map((c, i) => `[${i + 1}] ${c.text}`).join("\n\n")
+    ? chunks
+        .map((c, i) => {
+          const fileName = c.fileName || "unknown"
+          const uploadedAt = c.uploadTimestamp
+            ? new Date(c.uploadTimestamp).toISOString()
+            : "unknown"
+          return `[${i + 1}] [Source File: ${fileName}, Uploaded At: ${uploadedAt}]\nText: ${c.text}`
+        })
+        .join("\n\n")
     : "(לא נמצאו קטעים רלוונטיים)"
 
   const historyBlock = history.length
@@ -163,7 +185,7 @@ export type ChatReply = {
  */
 export async function chat(params: ChatParams): Promise<ChatReply> {
   // Fail fast with a precise message if any required key is missing
-  // (OpenAI + Pinecone for retrieval, Gemini for the answer).
+  // (OpenAI + Pinecone for retrieval, Anthropic for the answer).
   assertEmbeddingEnv()
   assertLlmEnv()
 
@@ -174,15 +196,22 @@ export async function chat(params: ChatParams): Promise<ChatReply> {
     getRecentHistory(sessionId, historyLimit),
   ])
 
+  // The retrieved context and recent history are folded into a single user
+  // turn; the persona/grounding rules ride on the Claude system prompt.
   const prompt = buildPrompt({ chunks, history, query: message })
 
-  const genAI = new GoogleGenerativeAI(requireEnv("GEMINI_API_KEY"))
-  const model = genAI.getGenerativeModel({
-    model: LLM_MODEL,
-    systemInstruction: buildSystemInstruction(userName),
+  const anthropic = getAnthropic()
+  const response = await anthropic.messages.create({
+    model: CHAT_MODEL,
+    max_tokens: MAX_OUTPUT_TOKENS,
+    system: buildSystemInstruction(userName),
+    messages: [{ role: "user", content: prompt }],
   })
-  const result = await model.generateContent(prompt)
-  const answer = result.response.text()
+
+  const answer = response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("")
 
   await prisma.chatMessage.createMany({
     data: [

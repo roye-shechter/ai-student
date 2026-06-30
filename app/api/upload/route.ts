@@ -162,6 +162,8 @@ export async function POST(req: Request) {
       userId,
       courseId: course.id,
       documentId: document.id,
+      fileName: file.name,
+      uploadTimestamp: document.createdAt.getTime(),
       text,
     })
 

@@ -41,8 +41,8 @@ DATABASE_URL="prisma+postgres://localhost:51213/?api_key=YOUR_API_KEY"
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="<your-generated-secret-here>"
 
-# Add your Gemini API key (get from: https://aistudio.google.com/app/apikey)
-GEMINI_API_KEY="your_gemini_api_key_here"
+# Add your Anthropic API key (get from: https://console.anthropic.com/settings/keys)
+ANTHROPIC_API_KEY="sk-ant-your_anthropic_key_here"
 ```
 
 ### Step 3: Start Local Database

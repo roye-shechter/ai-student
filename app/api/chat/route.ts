@@ -8,8 +8,8 @@ import { assertEmbeddingEnv, assertLlmEnv } from "@/lib/rag/clients"
 /**
  * Chat endpoint — drives the enterprise RAG pipeline (lib/rag/chat.ts):
  * embed the question (OpenAI) → retrieve from Pinecone (scoped to the
- * authenticated user + course) → answer with Gemini → persist the turn in
- * Postgres.
+ * authenticated user + course) → answer with Anthropic Claude → persist the
+ * turn in Postgres.
  *
  * The browser only sends the message and which course it is asking about.
  * `userId` is taken from the authenticated session (never trusted from the
@@ -26,7 +26,7 @@ type ChatRequestBody = {
 
 export async function POST(req: Request) {
   // Everything runs inside one comprehensive try/catch so that ANY failure
-  // (missing env keys, DB errors, OpenAI/Pinecone/Gemini timeouts, etc.) is
+  // (missing env keys, DB errors, OpenAI/Pinecone/Anthropic timeouts, etc.) is
   // logged and returned as JSON — never Next's default HTML error page, which
   // would break the client's response.json().
   try {

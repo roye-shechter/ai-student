@@ -1,4 +1,5 @@
 import OpenAI from "openai"
+import Anthropic from "@anthropic-ai/sdk"
 import { Pinecone, type RecordMetadata } from "@pinecone-database/pinecone"
 
 /**
@@ -19,6 +20,13 @@ export const EMBEDDING_MODEL = "text-embedding-3-small"
 export const EMBEDDING_DIMENSIONS = 1536
 
 /**
+ * Anthropic chat model. claude-sonnet-4-6 is the current best speed/intelligence
+ * balance and the documented replacement for the retired claude-3-5-sonnet — fast
+ * enough for an interactive tutor while following the system prompt closely.
+ */
+export const CHAT_MODEL = "claude-sonnet-4-6"
+
+/**
  * Metadata stored on every Pinecone vector. `userId` + `courseId` are the
  * strict multi-tenancy keys: every vector carries them and every query filters
  * on them (see chat.ts) to prevent cross-tenant data leakage.
@@ -32,6 +40,10 @@ export type ChunkMetadata = {
   documentId: string
   chunkIndex: number
   text: string
+  /** Original upload filename, so the AI can answer "based on the file X" queries. */
+  fileName: string
+  /** Upload time as epoch milliseconds, so the AI can reason about upload order. */
+  uploadTimestamp: number
 }
 
 let _openai: OpenAI | null = null
@@ -42,6 +54,16 @@ export function getOpenAI(): OpenAI {
     _openai = new OpenAI({ apiKey })
   }
   return _openai
+}
+
+let _anthropic: Anthropic | null = null
+export function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set")
+    _anthropic = new Anthropic({ apiKey })
+  }
+  return _anthropic
 }
 
 let _pinecone: Pinecone | null = null
@@ -102,7 +124,7 @@ export function assertEmbeddingEnv(): void {
   requireEnv("PINECONE_INDEX")
 }
 
-/** Validate the key needed for the chat LLM (Gemini). */
+/** Validate the key needed for the chat LLM (Anthropic Claude). */
 export function assertLlmEnv(): void {
-  requireEnv("GEMINI_API_KEY")
+  requireEnv("ANTHROPIC_API_KEY")
 }
