@@ -279,7 +279,7 @@ export default function CoursePage() {
             {isLoading && (
               <div className="flex gap-3 ml-auto items-center text-neutral-400 text-sm">
                 <Loader2 className="animate-spin text-[#d4af37]" size={18} />
-                ג'מיני חושב ומנתח את חומרי הלימוד...
+                המורה הפרטי חושב...
               </div>
             )}
           </CardContent>

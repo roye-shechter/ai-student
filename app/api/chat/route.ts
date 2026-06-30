@@ -106,12 +106,18 @@ export async function POST(req: Request) {
       message,
     })
 
-    return NextResponse.json({
-      text: reply.answer,
-      answer: reply.answer,
-      chunks: reply.chunks,
-      sessionId: chatSession.id,
-    })
+    // Pin the charset explicitly. The body bytes are already UTF-8, but some
+    // clients/proxies fall back to latin-1 when no charset is declared, which
+    // turns Hebrew (and math symbols) into gibberish on the wire.
+    return NextResponse.json(
+      {
+        text: reply.answer,
+        answer: reply.answer,
+        chunks: reply.chunks,
+        sessionId: chatSession.id,
+      },
+      { headers: { "Content-Type": "application/json; charset=utf-8" } }
+    )
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/chat failed:", error)
     const message =
