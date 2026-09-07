@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { gsap, useGSAP } from "@/lib/gsap"
+import { markJustLoggedIn } from "@/components/welcome-splash"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -56,6 +57,7 @@ export default function LoginPage() {
       if (result?.error) {
         setError("שם משתמש או סיסמה שגויים")
       } else if (result?.ok) {
+        markJustLoggedIn()
         router.push("/dashboard")
         router.refresh()
       }
@@ -72,12 +74,12 @@ export default function LoginPage() {
         <div className="login-mark text-center mb-2">
           <h1 className="font-serif gold-text text-5xl tracking-tight">AI Student</h1>
         </div>
-        <p className="login-sub text-center text-[#a89a82] mb-8">
+        <p className="login-sub text-center text-[#8b93a3] mb-8">
           המורה הפרטי שלך, זמין בכל שעה
         </p>
 
-        <div className="glass-panel border border-[#332b1f] rounded-sm overflow-hidden shadow-2xl shadow-black/40">
-          <div className="login-trace h-px w-full bg-[#b08d57] origin-center" />
+        <div className="glass-panel border border-[#242b3a] rounded-sm overflow-hidden shadow-2xl shadow-black/40">
+          <div className="login-trace h-px w-full bg-[#ff7a3d] origin-center" />
 
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
             {error && (
@@ -87,7 +89,7 @@ export default function LoginPage() {
             )}
 
             <div className="login-field space-y-2">
-              <Label htmlFor="username" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="username" className="text-[#c9c9d1] text-sm">
                 שם משתמש או אימייל
               </Label>
               <Input
@@ -96,14 +98,14 @@ export default function LoginPage() {
                 placeholder="yerahmiel"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-12 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57] transition-shadow duration-300"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-12 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d] transition-shadow duration-300"
                 required
                 disabled={isLoading}
               />
             </div>
 
             <div className="login-field space-y-2">
-              <Label htmlFor="password" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="password" className="text-[#c9c9d1] text-sm">
                 סיסמה
               </Label>
               <Input
@@ -112,7 +114,7 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-12 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57] transition-shadow duration-300"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-12 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d] transition-shadow duration-300"
                 required
                 disabled={isLoading}
               />
@@ -122,7 +124,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 text-base font-semibold text-[#17140f] bg-[#b08d57] hover:bg-[#d4b483] rounded-sm transition-all duration-300 active:scale-[0.99]"
+                className="w-full h-12 text-base font-semibold text-[#12161f] bg-[#ff7a3d] hover:bg-[#ffb066] rounded-full transition-all duration-300 active:scale-[0.99]"
               >
                 {isLoading ? (
                   <>
@@ -133,9 +135,9 @@ export default function LoginPage() {
                   "התחבר למערכת"
                 )}
               </Button>
-              <div className="text-center text-sm text-[#a89a82]">
+              <div className="text-center text-sm text-[#8b93a3]">
                 אין לך חשבון?{" "}
-                <Link href="/register" className="text-[#d4b483] hover:text-[#f0ece2] font-medium transition-colors">
+                <Link href="/register" className="text-[#ffb066] hover:text-[#f5f6f8] font-medium transition-colors">
                   הירשם כאן
                 </Link>
               </div>

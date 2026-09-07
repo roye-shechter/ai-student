@@ -29,13 +29,13 @@ type ProgressSummary = {
 
 // A gallery grid needs visual variety the way a photographer's portfolio
 // gets it from the photos themselves — since there are no real course
-// covers, these are hand-tuned muted gold/charcoal gradients standing in
-// for that variety, picked deterministically by position, not randomly.
+// covers, these are hand-tuned navy/amber gradients standing in for that
+// variety, picked deterministically by position, not randomly.
 const COVER_VARIANTS = [
-  "bg-[radial-gradient(ellipse_120%_100%_at_20%_0%,#3a2f1c,#17140f_70%)]",
-  "bg-[linear-gradient(135deg,#211d16,#0d0c0a_60%,#332a18_130%)]",
-  "bg-[radial-gradient(ellipse_100%_80%_at_80%_100%,#2a2214,#0d0c0a_70%)]",
-  "bg-[linear-gradient(200deg,#1a1712,#332b1f_50%,#0d0c0a_100%)]",
+  "bg-[radial-gradient(ellipse_120%_100%_at_20%_0%,#3a2210,#12161f_70%)]",
+  "bg-[linear-gradient(135deg,#161b26,#0a0e14_60%,#2a2015_130%)]",
+  "bg-[radial-gradient(ellipse_100%_80%_at_80%_100%,#2a2015,#0a0e14_70%)]",
+  "bg-[linear-gradient(200deg,#12151d,#242b3a_50%,#0a0e14_100%)]",
 ]
 
 export default function Dashboard() {
@@ -130,12 +130,12 @@ export default function Dashboard() {
   const hasScoreData = (progress?.attemptCount ?? 0) > 0
   const avgScore = Math.round(progress?.averageScore ?? 0)
   const scorePieData = [
-    { name: "רמת הבנה", value: avgScore, color: "#b08d57" },
-    { name: "נותר לחזק", value: 100 - avgScore, color: "#332b1f" },
+    { name: "רמת הבנה", value: avgScore, color: "#ff7a3d" },
+    { name: "נותר לחזק", value: 100 - avgScore, color: "#242b3a" },
   ]
 
   return (
-    <div ref={rootRef} className="relative z-10 min-h-screen text-[#f0ece2] p-8" dir="rtl">
+    <div ref={rootRef} className="relative z-10 min-h-screen text-[#f5f6f8] p-8" dir="rtl">
       {showOnboarding && <OnboardingModal onCompleted={handleOnboardingCompleted} />}
       {showCreateCourse && (
         <CreateCourseDialog onClose={() => setShowCreateCourse(false)} onCreated={handleCourseCreated} />
@@ -144,16 +144,16 @@ export default function Dashboard() {
       <div className="max-w-6xl mx-auto space-y-10">
 
         {/* כותרת הדשבורד */}
-        <header className="dash-header border-b border-[#332b1f] pb-6 flex justify-between items-end">
+        <header className="dash-header border-b border-[#242b3a] pb-6 flex justify-between items-end">
           <div>
             <h1 className="font-serif text-4xl gold-text">
               האזור האישי שלי
             </h1>
-            <p className="text-[#a89a82] text-base mt-2">
-              ברוך הבא, <span className="text-[#d4b483]">{displayName}</span>. הנה סיכום מצב הלמידה שלך.
+            <p className="text-[#8b93a3] text-base mt-2">
+              ברוך הבא, <span className="text-[#ffb066]">{displayName}</span>. הנה סיכום מצב הלמידה שלך.
             </p>
           </div>
-          <Button variant="outline" className="bg-transparent border-[#332b1f] text-[#a89a82] hover:bg-[#211d16] hover:text-[#d4b483] hover:border-[#b08d57]/50 rounded-sm transition-all duration-300">
+          <Button variant="outline" className="bg-transparent border-[#242b3a] text-[#8b93a3] hover:bg-[#161b26] hover:text-[#ffb066] hover:border-[#ff7a3d]/50 rounded-sm transition-all duration-300">
             הגדרות פרופיל
           </Button>
         </header>
@@ -161,13 +161,13 @@ export default function Dashboard() {
         {/* הספרייה שלי — גלריית הקורסים */}
         <section>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-serif text-2xl text-[#f0ece2]">
+            <h2 className="font-serif text-2xl text-[#f5f6f8]">
               הספרייה שלי
             </h2>
             <Button
               onClick={() => setShowCreateCourse(true)}
               variant="outline"
-              className="bg-transparent border-[#332b1f] text-[#a89a82] hover:text-[#d4b483] hover:border-[#b08d57]/50 rounded-sm flex items-center gap-2 transition-all duration-300"
+              className="bg-transparent border-[#242b3a] text-[#8b93a3] hover:text-[#ffb066] hover:border-[#ff7a3d]/50 rounded-sm flex items-center gap-2 transition-all duration-300"
             >
               <Plus size={16} />
               הוסף קורס חדש
@@ -175,18 +175,18 @@ export default function Dashboard() {
           </div>
 
           {loading ? (
-            <div className="flex items-center gap-2 text-[#a89a82] py-8">
-              <Loader2 className="animate-spin text-[#b08d57]" size={20} />
+            <div className="flex items-center gap-2 text-[#8b93a3] py-8">
+              <Loader2 className="animate-spin text-[#ff7a3d]" size={20} />
               טוען את הקורסים שלך...
             </div>
           ) : enrollments.length === 0 ? (
-            <Card className="bg-[#17140f] border-[#332b1f] border-dashed rounded-sm">
-              <CardContent className="py-10 text-center text-[#a89a82]">
-                <Sparkles className="mx-auto text-[#b08d57] mb-3" size={26} />
+            <Card className="bg-[#12161f] border-[#242b3a] border-dashed rounded-sm">
+              <CardContent className="py-10 text-center text-[#8b93a3]">
+                <Sparkles className="mx-auto text-[#ff7a3d] mb-3" size={26} />
                 <p className="mb-4">עדיין אין לך קורסים. צור את הקורס הראשון שלך כדי לפתוח את סביבת הלמידה.</p>
                 <Button
                   onClick={() => setShowCreateCourse(true)}
-                  className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] font-semibold rounded-sm inline-flex items-center gap-2"
+                  className="bg-[#ff7a3d] hover:bg-[#ffb066] text-[#12161f] font-semibold rounded-full inline-flex items-center gap-2"
                 >
                   <Plus size={18} />
                   הוסף קורס חדש
@@ -208,34 +208,34 @@ export default function Dashboard() {
                       <span className="tech-corner tech-corner-tr" />
                       <span className="tech-corner tech-corner-bl" />
                       <span className="tech-corner tech-corner-br" />
-                      <span className="absolute top-4 right-4 text-[10px] tracking-[0.15em] uppercase text-[#d4b483] bg-black/40 border border-[#b08d57]/30 px-2 py-1 rounded-sm font-tech">
+                      <span className="absolute top-4 right-4 text-[10px] tracking-[0.15em] uppercase text-[#ffb066] bg-black/40 border border-[#ff7a3d]/30 px-2 py-1 rounded-sm font-tech">
                         {course.credits} נ&quot;ז
                       </span>
-                      <h3 className="absolute bottom-4 right-4 left-4 font-serif text-2xl text-[#f0ece2] leading-tight">
+                      <h3 className="absolute bottom-4 right-4 left-4 font-serif text-2xl text-[#f5f6f8] leading-tight">
                         {course.courseName}
                       </h3>
                     </div>
 
                     <div className="pt-3">
                       {course.description && (
-                        <p className="text-xs text-[#a89a82] line-clamp-1 mb-2">{course.description}</p>
+                        <p className="text-xs text-[#8b93a3] line-clamp-1 mb-2">{course.description}</p>
                       )}
                       <div className="flex items-center justify-between mb-1.5">
-                        <div className="w-full max-w-[70%] bg-[#211d16] rounded-full h-[3px] overflow-hidden">
+                        <div className="w-full max-w-[70%] bg-[#161b26] rounded-full h-[3px] overflow-hidden">
                           <div
-                            className="dash-progress-fill bg-[#b08d57] h-full"
+                            className="dash-progress-fill bg-[#ff7a3d] h-full"
                             data-value={Math.round(completionPercentage)}
                             style={{ width: "0%" }}
                           />
                         </div>
                         <span
-                          className="dash-progress-number text-[11px] text-[#a89a82] tabular-nums"
+                          className="dash-progress-number text-[11px] text-[#8b93a3] tabular-nums"
                           data-value={Math.round(completionPercentage)}
                         >
                           0%
                         </span>
                       </div>
-                      <span className="text-sm text-[#d4b483] group-hover:text-[#5fc9bd] transition-colors duration-300 flex items-center gap-1.5">
+                      <span className="text-sm text-[#ffb066] group-hover:text-[#ffcc99] transition-colors duration-300 flex items-center gap-1.5">
                         היכנס ללמידה
                         <ArrowLeft size={13} className="transition-transform duration-300 group-hover:-translate-x-1.5" />
                       </span>
@@ -248,45 +248,45 @@ export default function Dashboard() {
         </section>
 
         {/* אזור האנליטיקה */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-[#332b1f]">
-          <Card className="dash-chart-card bg-[#17140f] border-[#332b1f] rounded-sm text-white">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-[#242b3a]">
+          <Card className="dash-chart-card bg-[#12161f] border-[#242b3a] rounded-sm text-white">
             <CardHeader>
-              <CardTitle className="text-[#d4b483] flex items-center gap-2 font-sans text-sm font-medium">
+              <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
                 <TrendingUp size={16} />
                 שעות למידה שבועיות
               </CardTitle>
             </CardHeader>
             <CardContent className="h-64">
               {!loading && !hasHoursData ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-[#a89a82] text-sm gap-2">
-                  <TrendingUp size={22} className="text-[#b08d57]/50" />
+                <div className="h-full flex flex-col items-center justify-center text-center text-[#8b93a3] text-sm gap-2">
+                  <TrendingUp size={22} className="text-[#ff7a3d]/50" />
                   עדיין אין נתוני זמן למידה. שיחה או מבחן תרגול ראשונים יופיעו כאן.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={progress?.weeklyHours ?? []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#332b1f" />
-                    <XAxis dataKey="name" stroke="#a89a82" />
-                    <YAxis stroke="#a89a82" />
-                    <Tooltip contentStyle={{ backgroundColor: '#17140f', borderColor: '#b08d57', color: '#fff' }} cursor={{ fill: '#ffffff08' }} />
-                    <Bar dataKey="hours" fill="#b08d57" radius={[2, 2, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#242b3a" />
+                    <XAxis dataKey="name" stroke="#8b93a3" />
+                    <YAxis stroke="#8b93a3" />
+                    <Tooltip contentStyle={{ backgroundColor: '#12161f', borderColor: '#ff7a3d', color: '#fff' }} cursor={{ fill: '#ffffff08' }} />
+                    <Bar dataKey="hours" fill="#ff7a3d" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
 
-          <Card className="dash-chart-card bg-[#17140f] border-[#332b1f] rounded-sm text-white">
+          <Card className="dash-chart-card bg-[#12161f] border-[#242b3a] rounded-sm text-white">
             <CardHeader>
-              <CardTitle className="text-[#d4b483] flex items-center gap-2 font-sans text-sm font-medium">
+              <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
                 <Target size={16} />
                 רמת הבנה ממוצעת (לפי מבחני תרגול)
               </CardTitle>
             </CardHeader>
             <CardContent className="h-64 flex items-center justify-center">
               {!loading && !hasScoreData ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-[#a89a82] text-sm gap-2 px-4">
-                  <Target size={22} className="text-[#b08d57]/50" />
+                <div className="h-full flex flex-col items-center justify-center text-center text-[#8b93a3] text-sm gap-2 px-4">
+                  <Target size={22} className="text-[#ff7a3d]/50" />
                   עדיין לא ביצעת מבחן תרגול. נסה אחד בעמוד של קורס כדי לראות כאן את רמת ההבנה שלך.
                 </div>
               ) : (
@@ -298,12 +298,12 @@ export default function Dashboard() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#17140f', borderColor: '#b08d57', color: '#fff' }} />
+                      <Tooltip contentStyle={{ backgroundColor: '#12161f', borderColor: '#ff7a3d', color: '#fff' }} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="font-serif text-2xl text-white">{avgScore}%</span>
-                    <span className="text-[10px] text-[#a89a82]">{progress?.attemptCount} מבחנים</span>
+                    <span className="text-[10px] text-[#8b93a3]">{progress?.attemptCount} מבחנים</span>
                   </div>
                 </div>
               )}
@@ -312,8 +312,8 @@ export default function Dashboard() {
         </section>
 
         {progress && progress.weakTopics.length > 0 && (
-          <section className="dash-chart-card border border-[#332b1f] rounded-sm p-6">
-            <h2 className="text-sm font-medium text-[#d4b483] flex items-center gap-2 mb-4">
+          <section className="dash-chart-card border border-[#242b3a] rounded-sm p-6">
+            <h2 className="text-sm font-medium text-[#ffb066] flex items-center gap-2 mb-4">
               <Sparkles size={16} />
               נושאים לחיזוק
             </h2>
@@ -321,14 +321,14 @@ export default function Dashboard() {
               {progress.weakTopics.map(({ topic, count }) => (
                 <span
                   key={topic}
-                  className="text-xs bg-[#211d16] text-[#c9bfa8] border border-[#332b1f] px-3 py-1.5 rounded-sm flex items-center gap-1.5"
+                  className="text-xs bg-[#161b26] text-[#c9c9d1] border border-[#242b3a] px-3 py-1.5 rounded-sm flex items-center gap-1.5"
                 >
                   {topic}
-                  <span className="text-[#d4b483] font-semibold">×{count}</span>
+                  <span className="text-[#ffb066] font-semibold">×{count}</span>
                 </span>
               ))}
             </div>
-            <p className="text-[11px] text-[#a89a82] mt-3">
+            <p className="text-[11px] text-[#8b93a3] mt-3">
               נושאים אלו הוזנו אוטומטית למורה הפרטי — הוא יתייחס אליהם ביוזמתו בפעם הבאה שתשוחח איתו.
             </p>
           </section>

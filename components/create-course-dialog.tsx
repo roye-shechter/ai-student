@@ -65,12 +65,12 @@ export function CreateCourseDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-[#17140f] border border-[#332b1f] rounded-sm shadow-2xl shadow-black/40 overflow-hidden"
+        className="w-full max-w-md bg-[#12161f] border border-[#242b3a] rounded-sm shadow-2xl shadow-black/40 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-[#332b1f]">
+        <div className="p-6 border-b border-[#242b3a]">
           <h2 className="font-serif text-xl gold-text flex items-center gap-2">
-            <BookPlus className="text-[#b08d57]" size={22} />
+            <BookPlus className="text-[#ff7a3d]" size={22} />
             הוספת קורס חדש
           </h2>
           <p className="text-neutral-400 text-sm mt-1">צור קורס משלך והעלה אליו חומרי לימוד.</p>
@@ -86,7 +86,7 @@ export function CreateCourseDialog({
               value={courseName}
               onChange={(e) => setCourseName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+              className="bg-[#161b26] border-[#242b3a] text-white focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
             />
           </div>
 
@@ -101,26 +101,26 @@ export function CreateCourseDialog({
               value={credits}
               onChange={(e) => setCredits(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+              className="bg-[#161b26] border-[#242b3a] text-white focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
             />
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
 
-        <div className="p-6 border-t border-[#332b1f] flex justify-end gap-2">
+        <div className="p-6 border-t border-[#242b3a] flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={onClose}
             disabled={submitting}
-            className="bg-transparent border-[#332b1f] text-neutral-300 hover:bg-[#211d16] hover:text-white rounded-sm"
+            className="bg-transparent border-[#242b3a] text-neutral-300 hover:bg-[#161b26] hover:text-white rounded-sm"
           >
             ביטול
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] font-semibold rounded-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#ff7a3d] hover:bg-[#ffb066] text-[#12161f] font-semibold rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <span className="flex items-center gap-2">

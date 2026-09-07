@@ -47,10 +47,10 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" dir="rtl">
-      <div className="w-full max-w-lg bg-[#17140f] border border-[#332b1f] rounded-sm shadow-2xl shadow-black/40 overflow-hidden">
-        <div className="p-6 border-b border-[#332b1f]">
+      <div className="w-full max-w-lg bg-[#12161f] border border-[#242b3a] rounded-sm shadow-2xl shadow-black/40 overflow-hidden">
+        <div className="p-6 border-b border-[#242b3a]">
           <h2 className="font-serif text-2xl gold-text flex items-center gap-2">
-            <GraduationCap className="text-[#b08d57]" size={26} />
+            <GraduationCap className="text-[#ff7a3d]" size={26} />
             ברוך הבא! בוא נשלים את הפרופיל
           </h2>
           <p className="text-neutral-400 text-sm mt-1">כמה פרטים אחרונים כדי להתאים לך את סביבת הלמידה.</p>
@@ -64,7 +64,7 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
               placeholder="לדוגמה: הטכניון, אוניברסיטת תל אביב..."
               value={institution}
               onChange={(e) => setInstitution(e.target.value)}
-              className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+              className="bg-[#161b26] border-[#242b3a] text-white focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
             />
           </div>
 
@@ -74,7 +74,7 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
               id="studyYear"
               value={studyYear}
               onChange={(e) => setStudyYear(e.target.value)}
-              className="w-full h-10 rounded-md bg-[#211d16] border border-[#332b1f] text-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+              className="w-full h-10 rounded-md bg-[#161b26] border border-[#242b3a] text-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
             >
               <option value="" disabled>בחר את שנת הלימוד שלך</option>
               {STUDY_YEARS.map((year) => (
@@ -86,11 +86,11 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
 
-        <div className="p-6 border-t border-[#332b1f] flex justify-end">
+        <div className="p-6 border-t border-[#242b3a] flex justify-end">
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] font-semibold rounded-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#ff7a3d] hover:bg-[#ffb066] text-[#12161f] font-semibold rounded-full transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <span className="flex items-center gap-2">

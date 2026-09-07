@@ -1,10 +1,10 @@
 // Generative, subject-aware cover art for a course. There is no real course
-// photography (see the classic-editorial dashboard redesign), so each card
-// earns its visual identity from a deterministic vector motif keyed off the
-// course name — an integral/graph line for math, an orbit for physics, a
-// molecule ring for chemistry, and so on — rendered in the app's gold/teal
-// duotone rather than a stock icon. Deterministic per course (seeded by
-// courseCode), not random per render, so a course's cover stays stable.
+// photography, so each card earns its visual identity from a deterministic
+// vector motif keyed off the course name — an integral/graph line for math,
+// an orbit for physics, a molecule ring for chemistry, and so on — rendered
+// in the app's navy/amber duotone rather than a stock icon. Deterministic
+// per course (seeded by courseCode), not random per render, so a course's
+// cover stays stable.
 
 type Category =
   | "math"
@@ -67,9 +67,9 @@ function rngFrom(seed: string) {
   }
 }
 
-const GOLD = "#d4b483"
-const GOLD_DIM = "#8a7550"
-const TEAL = "#5fc9bd"
+const ACCENT = "#ffb066"
+const DIM = "#5a6070"
+const ACCENT_ALT = "#ff7a3d"
 
 function Motif({ category, rand }: { category: Category; rand: () => number }) {
   const jitter = (range: number) => (rand() - 0.5) * range
@@ -80,18 +80,18 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const cy = 90 + jitter(10)
       return (
         <>
-          <path d={`M20,120 L20,20 M20,120 L185,120`} stroke={GOLD_DIM} strokeWidth="1" opacity="0.5" />
+          <path d={`M20,120 L20,20 M20,120 L185,120`} stroke={DIM} strokeWidth="1" opacity="0.5" />
           <path
             d={`M25,${cy + 25} C ${cx},${cy - 60} ${cx + 40},${cy + 60} 170,${cy - 40}`}
             fill="none"
-            stroke={TEAL}
+            stroke={ACCENT_ALT}
             strokeWidth="1.4"
             opacity="0.75"
           />
-          <circle cx={cx + 40} cy={cy + 60 - 90} r="2.5" fill={TEAL} opacity="0.9" />
-          <text x="118" y="45" fontFamily="Georgia, serif" fontSize="26" fill={GOLD}>∫</text>
-          <text x="150" y="95" fontFamily="Georgia, serif" fontSize="20" fill={GOLD} opacity="0.8">∑</text>
-          <text x="35" y="70" fontFamily="Georgia, serif" fontSize="17" fill={GOLD_DIM}>π</text>
+          <circle cx={cx + 40} cy={cy + 60 - 90} r="2.5" fill={ACCENT_ALT} opacity="0.9" />
+          <text x="118" y="45" fontFamily="Georgia, serif" fontSize="26" fill={ACCENT}>∫</text>
+          <text x="150" y="95" fontFamily="Georgia, serif" fontSize="20" fill={ACCENT} opacity="0.8">∑</text>
+          <text x="35" y="70" fontFamily="Georgia, serif" fontSize="17" fill={DIM}>π</text>
         </>
       )
     }
@@ -100,11 +100,11 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const rot = jitter(60)
       return (
         <>
-          <circle cx="100" cy="78" r="5" fill={GOLD} />
-          <ellipse cx="100" cy="78" rx={r1} ry="22" fill="none" stroke={GOLD_DIM} strokeWidth="1" transform={`rotate(${rot} 100 78)`} />
-          <ellipse cx="100" cy="78" rx="46" ry="46" fill="none" stroke={TEAL} strokeWidth="1" opacity="0.6" transform={`rotate(${rot + 55} 100 78)`} />
-          <circle cx={100 + r1 * Math.cos((rot * Math.PI) / 180)} cy={78 + 22 * Math.sin((rot * Math.PI) / 180)} r="2.5" fill={TEAL} />
-          <path d="M15,135 Q35,115 55,135 T95,135 T135,135 T175,135" fill="none" stroke={GOLD_DIM} strokeWidth="1" opacity="0.5" />
+          <circle cx="100" cy="78" r="5" fill={ACCENT} />
+          <ellipse cx="100" cy="78" rx={r1} ry="22" fill="none" stroke={DIM} strokeWidth="1" transform={`rotate(${rot} 100 78)`} />
+          <ellipse cx="100" cy="78" rx="46" ry="46" fill="none" stroke={ACCENT_ALT} strokeWidth="1" opacity="0.6" transform={`rotate(${rot + 55} 100 78)`} />
+          <circle cx={100 + r1 * Math.cos((rot * Math.PI) / 180)} cy={78 + 22 * Math.sin((rot * Math.PI) / 180)} r="2.5" fill={ACCENT_ALT} />
+          <path d="M15,135 Q35,115 55,135 T95,135 T135,135 T175,135" fill="none" stroke={DIM} strokeWidth="1" opacity="0.5" />
         </>
       )
     }
@@ -119,13 +119,13 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ") + " Z"
       return (
         <>
-          <path d={path} fill="none" stroke={GOLD} strokeWidth="1.2" opacity="0.75" />
+          <path d={path} fill="none" stroke={ACCENT} strokeWidth="1.2" opacity="0.75" />
           {pts.map((p, i) => (
-            <circle key={i} cx={p[0]} cy={p[1]} r="3" fill={i % 2 === 0 ? TEAL : GOLD_DIM} />
+            <circle key={i} cx={p[0]} cy={p[1]} r="3" fill={i % 2 === 0 ? ACCENT_ALT : DIM} />
           ))}
-          <line x1="150" y1="30" x2="170" y2="16" stroke={GOLD_DIM} strokeWidth="1" opacity="0.6" />
-          <circle cx="150" cy="30" r="2.5" fill={GOLD_DIM} />
-          <circle cx="170" cy="16" r="2.5" fill={TEAL} />
+          <line x1="150" y1="30" x2="170" y2="16" stroke={DIM} strokeWidth="1" opacity="0.6" />
+          <circle cx="150" cy="30" r="2.5" fill={DIM} />
+          <circle cx="170" cy="16" r="2.5" fill={ACCENT_ALT} />
         </>
       )
     }
@@ -136,10 +136,10 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const rungs = [30, 55, 80, 105, 130]
       return (
         <g transform="translate(50 0)">
-          <path d={path1} fill="none" stroke={GOLD} strokeWidth="1.3" opacity="0.75" />
-          <path d={path2} fill="none" stroke={TEAL} strokeWidth="1.3" opacity="0.7" />
+          <path d={path1} fill="none" stroke={ACCENT} strokeWidth="1.3" opacity="0.75" />
+          <path d={path2} fill="none" stroke={ACCENT_ALT} strokeWidth="1.3" opacity="0.7" />
           {rungs.map((y, i) => (
-            <line key={i} x1="25" y1={y} x2="55" y2={y} stroke={GOLD_DIM} strokeWidth="0.8" opacity="0.5" />
+            <line key={i} x1="25" y1={y} x2="55" y2={y} stroke={DIM} strokeWidth="0.8" opacity="0.5" />
           ))}
         </g>
       )
@@ -158,16 +158,16 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
               key={i}
               d={`M${nodes[a][0]},${nodes[a][1]} L${nodes[a][0]},${nodes[b][1]} L${nodes[b][0]},${nodes[b][1]}`}
               fill="none"
-              stroke={GOLD_DIM}
+              stroke={DIM}
               strokeWidth="1"
               opacity="0.55"
             />
           ))}
           {nodes.map(([x, y], i) => (
-            <rect key={i} x={x - 3} y={y - 3} width="6" height="6" fill={i % 3 === 0 ? TEAL : GOLD} opacity="0.85" />
+            <rect key={i} x={x - 3} y={y - 3} width="6" height="6" fill={i % 3 === 0 ? ACCENT_ALT : ACCENT} opacity="0.85" />
           ))}
-          <text x="115" y="55" fontFamily="var(--font-mono, monospace)" fontSize="11" fill={TEAL} opacity="0.7">01</text>
-          <text x="140" y="120" fontFamily="var(--font-mono, monospace)" fontSize="11" fill={GOLD_DIM} opacity="0.7">10</text>
+          <text x="115" y="55" fontFamily="var(--font-mono, monospace)" fontSize="11" fill={ACCENT_ALT} opacity="0.7">01</text>
+          <text x="140" y="120" fontFamily="var(--font-mono, monospace)" fontSize="11" fill={DIM} opacity="0.7">10</text>
         </>
       )
     }
@@ -177,15 +177,15 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       return (
         <>
           {heights.map((h, i) => (
-            <rect key={i} x={25 + i * 30} y={baseY - h} width="14" height={h} fill={i === heights.length - 1 ? TEAL : GOLD_DIM} opacity={i === heights.length - 1 ? 0.85 : 0.55} />
+            <rect key={i} x={25 + i * 30} y={baseY - h} width="14" height={h} fill={i === heights.length - 1 ? ACCENT_ALT : DIM} opacity={i === heights.length - 1 ? 0.85 : 0.55} />
           ))}
           <path
             d={`M32,${baseY - heights[0]} ${heights.map((h, i) => `L${32 + i * 30},${baseY - h}`).join(" ")}`}
             fill="none"
-            stroke={GOLD}
+            stroke={ACCENT}
             strokeWidth="1.3"
           />
-          <circle cx={32 + (heights.length - 1) * 30} cy={baseY - heights[heights.length - 1]} r="3" fill={GOLD} />
+          <circle cx={32 + (heights.length - 1) * 30} cy={baseY - heights[heights.length - 1]} r="3" fill={ACCENT} />
         </>
       )
     }
@@ -193,15 +193,15 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const tilt = jitter(6)
       return (
         <g transform={`rotate(${tilt} 100 75)`}>
-          <line x1="100" y1="25" x2="100" y2="130" stroke={GOLD_DIM} strokeWidth="1.2" opacity="0.6" />
-          <line x1="55" y1="40" x2="145" y2="40" stroke={GOLD} strokeWidth="1.2" />
-          <line x1="55" y1="40" x2="40" y2="75" stroke={GOLD_DIM} strokeWidth="1" opacity="0.6" />
-          <line x1="55" y1="40" x2="70" y2="75" stroke={GOLD_DIM} strokeWidth="1" opacity="0.6" />
-          <path d="M40,75 A15,10 0 0 0 70,75" fill="none" stroke={TEAL} strokeWidth="1.2" opacity="0.75" />
-          <line x1="145" y1="40" x2="130" y2="75" stroke={GOLD_DIM} strokeWidth="1" opacity="0.6" />
-          <line x1="145" y1="40" x2="160" y2="75" stroke={GOLD_DIM} strokeWidth="1" opacity="0.6" />
-          <path d="M130,75 A15,10 0 0 0 160,75" fill="none" stroke={TEAL} strokeWidth="1.2" opacity="0.75" />
-          <line x1="75" y1="130" x2="125" y2="130" stroke={GOLD_DIM} strokeWidth="1.2" opacity="0.6" />
+          <line x1="100" y1="25" x2="100" y2="130" stroke={DIM} strokeWidth="1.2" opacity="0.6" />
+          <line x1="55" y1="40" x2="145" y2="40" stroke={ACCENT} strokeWidth="1.2" />
+          <line x1="55" y1="40" x2="40" y2="75" stroke={DIM} strokeWidth="1" opacity="0.6" />
+          <line x1="55" y1="40" x2="70" y2="75" stroke={DIM} strokeWidth="1" opacity="0.6" />
+          <path d="M40,75 A15,10 0 0 0 70,75" fill="none" stroke={ACCENT_ALT} strokeWidth="1.2" opacity="0.75" />
+          <line x1="145" y1="40" x2="130" y2="75" stroke={DIM} strokeWidth="1" opacity="0.6" />
+          <line x1="145" y1="40" x2="160" y2="75" stroke={DIM} strokeWidth="1" opacity="0.6" />
+          <path d="M130,75 A15,10 0 0 0 160,75" fill="none" stroke={ACCENT_ALT} strokeWidth="1.2" opacity="0.75" />
+          <line x1="75" y1="130" x2="125" y2="130" stroke={DIM} strokeWidth="1.2" opacity="0.6" />
         </g>
       )
     }
@@ -219,13 +219,13 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
             const y1 = cy + rInner * Math.sin(a)
             const x2 = cx + rOuter * Math.cos(a)
             const y2 = cy + rOuter * Math.sin(a)
-            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={GOLD} strokeWidth="3" opacity="0.7" />
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={ACCENT} strokeWidth="3" opacity="0.7" />
           })}
-          <circle cx={cx} cy={cy} r={rInner} fill="none" stroke={GOLD} strokeWidth="1.2" opacity="0.75" />
-          <circle cx={cx} cy={cy} r="5" fill={TEAL} />
-          <line x1="15" y1="140" x2="185" y2="140" stroke={GOLD_DIM} strokeWidth="0.8" opacity="0.4" />
+          <circle cx={cx} cy={cy} r={rInner} fill="none" stroke={ACCENT} strokeWidth="1.2" opacity="0.75" />
+          <circle cx={cx} cy={cy} r="5" fill={ACCENT_ALT} />
+          <line x1="15" y1="140" x2="185" y2="140" stroke={DIM} strokeWidth="0.8" opacity="0.4" />
           {[30, 60, 90, 120, 150, 180].map((x, i) => (
-            <line key={i} x1={x} y1="136" x2={x} y2="144" stroke={GOLD_DIM} strokeWidth="0.8" opacity="0.4" />
+            <line key={i} x1={x} y1="136" x2={x} y2="144" stroke={DIM} strokeWidth="0.8" opacity="0.4" />
           ))}
         </>
       )
@@ -234,10 +234,10 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       const sway = jitter(10)
       return (
         <>
-          <path d={`M30,140 C ${60 + sway},60 ${140 - sway},90 165,25`} fill="none" stroke={GOLD} strokeWidth="1.4" opacity="0.8" />
-          <circle cx="165" cy="25" r="2.5" fill={TEAL} />
+          <path d={`M30,140 C ${60 + sway},60 ${140 - sway},90 165,25`} fill="none" stroke={ACCENT} strokeWidth="1.4" opacity="0.8" />
+          <circle cx="165" cy="25" r="2.5" fill={ACCENT_ALT} />
           {[0, 1, 2, 3].map((i) => (
-            <line key={i} x1="30" y1={100 + i * 12} x2={30 + 60 - i * 14} y2={100 + i * 12} stroke={GOLD_DIM} strokeWidth="1" opacity="0.5" />
+            <line key={i} x1="30" y1={100 + i * 12} x2={30 + 60 - i * 14} y2={100 + i * 12} stroke={DIM} strokeWidth="1" opacity="0.5" />
           ))}
         </>
       )
@@ -253,10 +253,10 @@ function Motif({ category, rand }: { category: Category; rand: () => number }) {
       return (
         <>
           {edges.map(([a, b], i) => (
-            <line key={i} x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke={GOLD_DIM} strokeWidth="0.9" opacity="0.45" />
+            <line key={i} x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke={DIM} strokeWidth="0.9" opacity="0.45" />
           ))}
           {nodes.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 3.5 : 2.5} fill={i % 3 === 0 ? TEAL : GOLD} opacity="0.85" />
+            <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 3.5 : 2.5} fill={i % 3 === 0 ? ACCENT_ALT : ACCENT} opacity="0.85" />
           ))}
         </>
       )

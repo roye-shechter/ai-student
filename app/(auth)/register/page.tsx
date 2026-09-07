@@ -87,10 +87,10 @@ export default function RegisterPage() {
         <div className="login-mark text-center mb-2">
           <h1 className="font-serif gold-text text-4xl tracking-tight">הרשמה למערכת</h1>
         </div>
-        <p className="login-sub text-center text-[#a89a82] mb-8">צור חשבון חדש ב-AI Student</p>
+        <p className="login-sub text-center text-[#8b93a3] mb-8">צור חשבון חדש ב-AI Student</p>
 
-        <div className="glass-panel border border-[#332b1f] rounded-sm overflow-hidden shadow-2xl shadow-black/40">
-          <div className="login-trace h-px w-full bg-[#b08d57] origin-center" />
+        <div className="glass-panel border border-[#242b3a] rounded-sm overflow-hidden shadow-2xl shadow-black/40">
+          <div className="login-trace h-px w-full bg-[#ff7a3d] origin-center" />
 
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
             {error && (
@@ -100,7 +100,7 @@ export default function RegisterPage() {
             )}
 
             <div className="login-field space-y-2">
-              <Label htmlFor="fullName" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="fullName" className="text-[#c9c9d1] text-sm">
                 שם מלא (אופציונלי)
               </Label>
               <Input
@@ -109,12 +109,12 @@ export default function RegisterPage() {
                 placeholder="ירחמיאל ליפשיץ"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-11 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-11 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
                 disabled={isLoading}
               />
             </div>
             <div className="login-field space-y-2">
-              <Label htmlFor="email" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="email" className="text-[#c9c9d1] text-sm">
                 כתובת אימייל
               </Label>
               <Input
@@ -123,13 +123,13 @@ export default function RegisterPage() {
                 placeholder="yerahmiel@example.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-11 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-11 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
                 required
                 disabled={isLoading}
               />
             </div>
             <div className="login-field space-y-2">
-              <Label htmlFor="username" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="username" className="text-[#c9c9d1] text-sm">
                 שם משתמש
               </Label>
               <Input
@@ -138,13 +138,13 @@ export default function RegisterPage() {
                 placeholder="yerahmiel"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-11 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-11 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
                 required
                 disabled={isLoading}
               />
             </div>
             <div className="login-field space-y-2">
-              <Label htmlFor="password" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="password" className="text-[#c9c9d1] text-sm">
                 סיסמה
               </Label>
               <Input
@@ -153,14 +153,14 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-11 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-11 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
                 required
                 disabled={isLoading}
                 minLength={6}
               />
             </div>
             <div className="login-field space-y-2">
-              <Label htmlFor="confirmPassword" className="text-[#c9bfa8] text-sm">
+              <Label htmlFor="confirmPassword" className="text-[#c9c9d1] text-sm">
                 אימות סיסמה
               </Label>
               <Input
@@ -169,7 +169,7 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                className="bg-[#211d16] border-[#332b1f] text-white rounded-sm h-11 focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
+                className="bg-[#161b26] border-[#242b3a] text-white rounded-sm h-11 focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
                 required
                 disabled={isLoading}
               />
@@ -179,7 +179,7 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 text-base font-semibold text-[#17140f] bg-[#b08d57] hover:bg-[#d4b483] rounded-sm transition-all duration-300 active:scale-[0.99]"
+                className="w-full h-12 text-base font-semibold text-[#12161f] bg-[#ff7a3d] hover:bg-[#ffb066] rounded-full transition-all duration-300 active:scale-[0.99]"
               >
                 {isLoading ? (
                   <>
@@ -190,9 +190,9 @@ export default function RegisterPage() {
                   "הרשם למערכת"
                 )}
               </Button>
-              <div className="text-center text-sm text-[#a89a82]">
+              <div className="text-center text-sm text-[#8b93a3]">
                 כבר יש לך חשבון?{" "}
-                <Link href="/" className="text-[#d4b483] hover:text-[#f0ece2] font-medium transition-colors">
+                <Link href="/" className="text-[#ffb066] hover:text-[#f5f6f8] font-medium transition-colors">
                   התחבר כאן
                 </Link>
               </div>
