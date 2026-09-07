@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ArrowLeft, Loader2, Sparkles, Plus, TrendingUp, Target } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import { CreateCourseDialog } from "@/components/create-course-dialog"
+import { CourseIllustration } from "@/components/course-illustration"
 import { readJson } from "@/lib/http"
 import { gsap, useGSAP } from "@/lib/gsap"
 
@@ -195,11 +196,19 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {enrollments.map(({ course, completionPercentage }, i) => (
-                <Link key={course.id} href={`/dashboard/${course.courseCode}`} className="dash-course-card group block">
+                <Link key={course.id} href={`/dashboard/${course.courseCode}`} className="dash-course-card group group/tech block">
                   <article>
-                    <div className={`relative aspect-[4/3] rounded-sm overflow-hidden ${COVER_VARIANTS[i % COVER_VARIANTS.length]} transition-transform duration-500 group-hover:scale-[1.02]`}>
+                    <div
+                      className={`tech-glow-border relative aspect-[4/3] rounded-sm overflow-hidden border border-transparent ${COVER_VARIANTS[i % COVER_VARIANTS.length]} transition-transform duration-500 group-hover:scale-[1.02]`}
+                    >
+                      <CourseIllustration courseName={course.courseName} description={course.description} seed={course.courseCode} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                      <span className="absolute top-4 right-4 text-[10px] tracking-[0.15em] uppercase text-[#d4b483] bg-black/40 border border-[#b08d57]/30 px-2 py-1 rounded-sm">
+                      <div className="tech-scan" />
+                      <span className="tech-corner tech-corner-tl" />
+                      <span className="tech-corner tech-corner-tr" />
+                      <span className="tech-corner tech-corner-bl" />
+                      <span className="tech-corner tech-corner-br" />
+                      <span className="absolute top-4 right-4 text-[10px] tracking-[0.15em] uppercase text-[#d4b483] bg-black/40 border border-[#b08d57]/30 px-2 py-1 rounded-sm font-tech">
                         {course.credits} נ&quot;ז
                       </span>
                       <h3 className="absolute bottom-4 right-4 left-4 font-serif text-2xl text-[#f0ece2] leading-tight">
@@ -226,9 +235,9 @@ export default function Dashboard() {
                           0%
                         </span>
                       </div>
-                      <span className="text-sm text-[#d4b483] group-hover:text-[#f0ece2] transition-colors flex items-center gap-1.5">
+                      <span className="text-sm text-[#d4b483] group-hover:text-[#5fc9bd] transition-colors duration-300 flex items-center gap-1.5">
                         היכנס ללמידה
-                        <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-1" />
+                        <ArrowLeft size={13} className="transition-transform duration-300 group-hover:-translate-x-1.5" />
                       </span>
                     </div>
                   </article>
