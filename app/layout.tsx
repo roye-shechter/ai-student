@@ -1,16 +1,24 @@
 import type { Metadata } from "next";
-import { Heebo, Geist_Mono } from "next/font/google";
+import { Heebo, Frank_Ruhl_Libre, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { MathBackdrop } from "@/components/math-backdrop";
+import { AmbientTexture } from "@/components/ambient-texture";
 
-// Heebo: a geometric grotesk purpose-built for Hebrew+Latin, used as the
-// single family across the whole product — hierarchy comes from its wide
-// weight range (100-900) and scale, not from mixing typefaces.
+// Two families, deliberately: Frank Ruhl Libre — a serif with real literary
+// Hebrew pedigree — carries every headline and display number, the way a
+// premium editorial/photography site leans on type instead of chrome.
+// Heebo stays for body copy and UI controls, where a serif would fight
+// legibility at small sizes.
 const heebo = Heebo({
   variable: "--font-heebo",
   subsets: ["hebrew", "latin"],
   weight: ["300", "400", "500", "600", "700", "800", "900"],
+});
+
+const frankRuhlLibre = Frank_Ruhl_Libre({
+  variable: "--font-serif-display",
+  subsets: ["hebrew", "latin"],
+  weight: ["400", "500", "700", "900"],
 });
 
 const geistMono = Geist_Mono({
@@ -31,10 +39,10 @@ export default function RootLayout({
   return (
     <html lang="he" suppressHydrationWarning>
       <body
-        className={`${heebo.variable} ${geistMono.variable} min-h-full flex flex-col antialiased`}
+        className={`${heebo.variable} ${frankRuhlLibre.variable} ${geistMono.variable} min-h-full flex flex-col antialiased`}
         suppressHydrationWarning
       >
-        <MathBackdrop />
+        <AmbientTexture />
         <Providers>
           {children}
         </Providers>

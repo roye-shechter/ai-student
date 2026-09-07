@@ -65,12 +65,12 @@ export function CreateCourseDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-[#14131f] border border-[#7c5cff]/40 rounded-2xl shadow-2xl shadow-[#7c5cff]/10 overflow-hidden"
+        className="w-full max-w-md bg-[#17140f] border border-[#332b1f] rounded-sm shadow-2xl shadow-black/40 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-[#29253f]">
-          <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#7c5cff] to-[#34e4ea] flex items-center gap-2">
-            <BookPlus className="text-[#7c5cff]" size={22} />
+        <div className="p-6 border-b border-[#332b1f]">
+          <h2 className="font-serif text-xl gold-text flex items-center gap-2">
+            <BookPlus className="text-[#b08d57]" size={22} />
             הוספת קורס חדש
           </h2>
           <p className="text-neutral-400 text-sm mt-1">צור קורס משלך והעלה אליו חומרי לימוד.</p>
@@ -86,7 +86,7 @@ export function CreateCourseDialog({
               value={courseName}
               onChange={(e) => setCourseName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="bg-[#1c1a2b] border-[#29253f] text-white focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff]"
+              className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
             />
           </div>
 
@@ -101,26 +101,26 @@ export function CreateCourseDialog({
               value={credits}
               onChange={(e) => setCredits(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="bg-[#1c1a2b] border-[#29253f] text-white focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff]"
+              className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
             />
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
 
-        <div className="p-6 border-t border-[#29253f] flex justify-end gap-2">
+        <div className="p-6 border-t border-[#332b1f] flex justify-end gap-2">
           <Button
             variant="outline"
             onClick={onClose}
             disabled={submitting}
-            className="bg-[#14131f] border-[#29253f] text-neutral-300 hover:bg-[#1c1a2b] hover:text-white"
+            className="bg-transparent border-[#332b1f] text-neutral-300 hover:bg-[#211d16] hover:text-white rounded-sm"
           >
             ביטול
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] text-white font-semibold transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] font-semibold rounded-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <span className="flex items-center gap-2">

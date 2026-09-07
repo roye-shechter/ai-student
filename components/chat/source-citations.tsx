@@ -36,9 +36,9 @@ export function SourceCitations({ chunks }: { chunks: SourceChunk[] }) {
             <button
               type="button"
               onClick={() => setExpandedFile(isOpen ? null : fileName)}
-              className="flex items-center gap-1 text-[10px] bg-[#1c1a2b] border border-[#29253f] text-neutral-300 hover:border-[#7c5cff]/50 rounded-full px-2 py-1 transition-colors"
+              className="flex items-center gap-1 text-[10px] bg-[#211d16] border border-[#332b1f] text-neutral-300 hover:border-[#b08d57]/50 rounded-sm px-2 py-1 transition-colors"
             >
-              <FileText size={10} className="text-[#9b82ff]" />
+              <FileText size={10} className="text-[#d4b483]" />
               {fileName}
               {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
@@ -47,7 +47,7 @@ export function SourceCitations({ chunks }: { chunks: SourceChunk[] }) {
                 {fileChunks.map((chunk) => (
                   <p
                     key={`${chunk.documentId}-${chunk.chunkIndex}`}
-                    className="text-[11px] text-neutral-400 bg-[#0a0a12] border border-[#29253f] rounded p-2 leading-relaxed"
+                    className="text-[11px] text-neutral-400 bg-[#0d0c0a] border border-[#332b1f] rounded-sm p-2 leading-relaxed"
                   >
                     {chunk.text.slice(0, 400)}
                     {chunk.text.length > 400 ? "…" : ""}

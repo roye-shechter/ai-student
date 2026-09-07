@@ -45,7 +45,7 @@ function isAudioFile(file: File): boolean {
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
   indexed: { label: "מאונדקס", className: "text-emerald-400" },
-  processing: { label: "מעבד", className: "text-[#9b82ff]" },
+  processing: { label: "מעבד", className: "text-[#d4b483]" },
   pending: { label: "ממתין", className: "text-neutral-400" },
   failed: { label: "נכשל", className: "text-red-400" },
 }
@@ -67,13 +67,13 @@ function StatusBadge({ status }: { status: string }) {
 function ThinkingIndicator() {
   return (
     <div className="flex gap-3 ml-auto items-center text-neutral-400 text-sm">
-      <div className="p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 bg-[#1c1a2b] text-[#9b82ff]">
+      <div className="p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 bg-[#211d16] text-[#d4b483]">
         <Bot size={16} />
       </div>
-      <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl rounded-tr-none bg-[#1c1a2b]">
-        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#7c5cff]" style={{ animationDelay: "0ms" }} />
-        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#9b82ff]" style={{ animationDelay: "150ms" }} />
-        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#34e4ea]" style={{ animationDelay: "300ms" }} />
+      <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl rounded-tr-none bg-[#211d16]">
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#b08d57]" style={{ animationDelay: "0ms" }} />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#c9a876]" style={{ animationDelay: "150ms" }} />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#d4b483]" style={{ animationDelay: "300ms" }} />
       </div>
     </div>
   )
@@ -295,13 +295,13 @@ export default function CoursePage() {
 
   return (
     <div ref={rootRef} className="relative z-10 min-h-screen text-white flex flex-col" dir="rtl">
-      <div className="course-header border-b border-[#29253f] glass-panel p-4">
+      <div className="course-header border-b border-[#332b1f] glass-panel p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-neutral-400 hover:text-[#9b82ff] transition-colors text-sm">
+          <Link href="/dashboard" className="flex items-center gap-2 text-neutral-400 hover:text-[#d4b483] transition-colors text-sm">
             <ArrowRight size={16} />
             חזרה לדשבורד הראשי
           </Link>
-          <span className="text-xs bg-[#221c3d] text-[#9b82ff] border border-[#7c5cff]/40 px-2 py-1 rounded">סביבת לימוד מבוססת AI</span>
+          <span className="text-xs bg-[#2a2214] text-[#d4b483] border border-[#b08d57]/40 px-2 py-1 rounded">סביבת לימוד מבוססת AI</span>
         </div>
       </div>
 
@@ -309,20 +309,20 @@ export default function CoursePage() {
 
         {/* חלק ימין: חומרי לימוד */}
         <div className="space-y-6 flex flex-col">
-          <div className="course-info-card glass-panel border border-[#29253f] rounded-xl p-6 space-y-3">
-            <h1 className="gradient-text text-3xl font-black">{courseTitle}</h1>
+          <div className="course-info-card glass-panel border border-[#332b1f] rounded-sm p-6 space-y-3">
+            <h1 className="font-serif gold-text text-3xl">{courseTitle}</h1>
             {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
             <Link href={`/dashboard/${courseCode}/quiz`} className="block">
-              <Button className="w-full bg-[#221c3d] hover:bg-[#2c2450] text-[#9b82ff] border border-[#7c5cff]/40 flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/20">
+              <Button className="w-full bg-[#2a2214] hover:bg-[#342a17] text-[#d4b483] border border-[#b08d57]/40 rounded-sm flex items-center gap-2 transition-all duration-300">
                 <GraduationCap size={16} />
                 התחל מבחן תרגול
               </Button>
             </Link>
           </div>
 
-          <Card className="course-docs-card glass-panel border-[#29253f] text-white flex-1 flex flex-col">
+          <Card className="course-docs-card glass-panel border-[#332b1f] text-white flex-1 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-lg text-[#9b82ff] flex items-center gap-2">
+              <CardTitle className="text-lg text-[#d4b483] flex items-center gap-2">
                 <UploadCloud size={20} />
                 חומרי קורס זה
               </CardTitle>
@@ -340,10 +340,10 @@ export default function CoursePage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="w-full border-2 border-dashed border-[#29253f] rounded-lg p-6 text-center bg-[#0a0a12]/40 transition-all duration-300 hover:border-[#7c5cff]/60 hover:bg-[#0a0a12]/70 hover:shadow-[0_0_20px_-4px_rgba(124,92,255,0.3)] disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full border-2 border-dashed border-[#332b1f] rounded-sm p-6 text-center bg-[#0d0c0a]/40 transition-all duration-300 hover:border-[#b08d57]/60 hover:bg-[#0d0c0a]/70 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
-                  <Loader2 size={28} className="mx-auto text-[#7c5cff] mb-2 animate-spin" />
+                  <Loader2 size={28} className="mx-auto text-[#b08d57] mb-2 animate-spin" />
                 ) : (
                   <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
                 )}
@@ -372,12 +372,12 @@ export default function CoursePage() {
                   documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center gap-2 p-2 bg-[#0a0a12] border border-[#29253f] rounded text-xs text-neutral-300"
+                      className="flex items-center gap-2 p-2 bg-[#0d0c0a] border border-[#332b1f] rounded text-xs text-neutral-300"
                     >
                       {doc.fileType === "audio" ? (
-                        <FileAudio size={14} className="text-[#34e4ea] shrink-0" />
+                        <FileAudio size={14} className="text-[#c9a876] shrink-0" />
                       ) : (
-                        <FileText size={14} className="text-[#9b82ff] shrink-0" />
+                        <FileText size={14} className="text-[#d4b483] shrink-0" />
                       )}
                       <span className="truncate flex-1">{doc.title}</span>
                       <span className="text-[10px] text-neutral-500 shrink-0">{doc.chunkCount} קטעים</span>
@@ -391,10 +391,10 @@ export default function CoursePage() {
         </div>
 
         {/* חלק שמאל: הצ'אט האמיתי */}
-        <Card className="course-chat-card glass-panel border-[#29253f] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
-          <CardHeader className="border-b border-[#29253f] pb-4">
+        <Card className="course-chat-card glass-panel border-[#332b1f] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
+          <CardHeader className="border-b border-[#332b1f] pb-4">
             <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Bot className="text-[#7c5cff]" size={22} />
+              <Bot className="text-[#b08d57]" size={22} />
               עוזר למידה אישי מבוסס מסמכים
             </CardTitle>
             <CardDescription className="text-neutral-400 text-xs">שאל כל דבר על החומר; ה-AI מונחה להשיב אך ורק מתוך מסמכי הקורס שהועלו.</CardDescription>
@@ -405,17 +405,17 @@ export default function CoursePage() {
               const isStreamingThisMessage = isLoading && streamStarted && index === messages.length - 1 && msg.role === "assistant"
               return (
                 <div key={index} className={`msg-in flex gap-3 max-w-[85%] ${msg.role === "user" ? "mr-auto flex-row-reverse" : "ml-auto"}`}>
-                  <div className={`p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-gradient-to-br from-[#7c5cff] to-[#5a3fd6] text-white" : "bg-[#1c1a2b] text-[#9b82ff]"}`}>
+                  <div className={`p-2 rounded-sm flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-[#b08d57] text-[#17140f]" : "bg-[#211d16] text-[#d4b483]"}`}>
                     {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
                   </div>
-                  <div className={`p-3 rounded-xl text-sm leading-relaxed ${msg.role === "user" ? "bg-gradient-to-br from-[#7c5cff] to-[#5a3fd6] text-white rounded-tl-none text-left" : "bg-[#1c1a2b] text-neutral-100 rounded-tr-none"}`}>
+                  <div className={`p-3 rounded-sm text-sm leading-relaxed ${msg.role === "user" ? "bg-[#b08d57] text-[#17140f] text-left" : "bg-[#211d16] text-neutral-100"}`}>
                     {msg.role === "user" ? (
                       msg.text
                     ) : (
                       <>
                         <MarkdownMessage content={msg.text} />
                         {isStreamingThisMessage && (
-                          <span className="inline-block w-1.5 h-4 bg-[#34e4ea] animate-pulse align-middle ml-1" />
+                          <span className="inline-block w-1.5 h-4 bg-[#d4b483] animate-pulse align-middle ml-1" />
                         )}
                         {msg.chunks && <SourceCitations chunks={msg.chunks} />}
                       </>
@@ -445,7 +445,7 @@ export default function CoursePage() {
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-[#29253f] p-4 bg-[#0a0a12]/20">
+          <CardFooter className="border-t border-[#332b1f] p-4 bg-[#0d0c0a]/20">
             <div className="flex w-full gap-2 items-center">
               <Input
                 type="text"
@@ -453,15 +453,15 @@ export default function CoursePage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                className="bg-[#1c1a2b] border-[#29253f] text-white focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff] h-12 flex-1 transition-shadow duration-300 focus-visible:shadow-[0_0_16px_-2px_rgba(124,92,255,0.4)]"
+                className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57] h-12 flex-1 transition-shadow duration-300 focus-visible:shadow-[0_0_16px_-2px_rgba(124,92,255,0.4)]"
                 disabled={isLoading}
               />
               {isLoading ? (
-                <Button onClick={handleStop} className="bg-[#29253f] hover:bg-red-900/50 text-white h-12 px-4 transition-all duration-300">
+                <Button onClick={handleStop} className="bg-[#332b1f] hover:bg-red-900/50 text-white h-12 px-4 transition-all duration-300">
                   <Square size={16} />
                 </Button>
               ) : (
-                <Button onClick={handleSendMessage} className="bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] text-white h-12 px-4 transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/30 active:scale-95">
+                <Button onClick={handleSendMessage} className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] h-12 px-4 rounded-sm transition-all duration-300 active:scale-95">
                   <Send size={18} className="rotate-180" />
                 </Button>
               )}

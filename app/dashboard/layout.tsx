@@ -23,8 +23,8 @@ export default function DashboardLayout({
     return (
       <div className="relative z-10 min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-[#7c5cff] mx-auto mb-4" />
-          <p className="text-[#8d89ac]">טוען...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-[#b08d57] mx-auto mb-4" />
+          <p className="text-[#a89a82]">טוען...</p>
         </div>
       </div>
     )

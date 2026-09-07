@@ -94,7 +94,7 @@ export default function QuizPage() {
         .fromTo(
           ".quiz-verdict-icon",
           { opacity: 0, scale: 0 },
-          { opacity: 1, scale: 1, duration: 0.35, stagger: 0.06, ease: "back.out(2)" },
+          { opacity: 1, scale: 1, duration: 0.4, stagger: 0.06, ease: "power2.out" },
           "-=0.15"
         )
     },
@@ -166,24 +166,24 @@ export default function QuizPage() {
 
   return (
     <div ref={rootRef} className="relative z-10 min-h-screen text-white flex flex-col" dir="rtl">
-      <div className="quiz-header border-b border-[#29253f] glass-panel p-4">
+      <div className="quiz-header border-b border-[#332b1f] glass-panel p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link
             href={`/dashboard/${courseCode}`}
-            className="flex items-center gap-2 text-neutral-400 hover:text-[#9b82ff] transition-colors text-sm"
+            className="flex items-center gap-2 text-neutral-400 hover:text-[#d4b483] transition-colors text-sm"
           >
             <ArrowRight size={16} />
             חזרה לצ&apos;אט הקורס
           </Link>
-          <span className="text-xs bg-[#221c3d] text-[#9b82ff] border border-[#7c5cff]/40 px-2 py-1 rounded">
+          <span className="text-xs bg-[#2a2214] text-[#d4b483] border border-[#b08d57]/40 px-2 py-1 rounded">
             מבחן תרגול מבוסס AI
           </span>
         </div>
       </div>
 
       <div className="flex-1 max-w-4xl w-full mx-auto p-6 space-y-6">
-        <div className="quiz-header glass-panel border border-[#29253f] rounded-xl p-6">
-          <h1 className="gradient-text text-2xl font-black">
+        <div className="quiz-header glass-panel border border-[#332b1f] rounded-sm p-6">
+          <h1 className="font-serif gold-text text-2xl">
             {quiz?.quizTitle ?? (course ? `מבחן תרגול - ${course.courseName}` : "מבחן תרגול")}
           </h1>
           <p className="text-neutral-400 text-sm mt-1">
@@ -199,16 +199,16 @@ export default function QuizPage() {
         )}
 
         {stage === "idle" && (
-          <Card className="quiz-header glass-panel border-[#29253f] text-white">
+          <Card className="quiz-header glass-panel border-[#332b1f] text-white">
             <CardContent className="p-10 text-center space-y-4">
-              <GraduationCap size={40} className="mx-auto text-[#7c5cff]" />
+              <GraduationCap size={40} className="mx-auto text-[#b08d57]" />
               <p className="text-neutral-300 text-sm">
                 מוכן לבדוק כמה מהחומר נטמע? המורה הפרטי יבנה מבחן קצר מותאם אישית.
               </p>
               <Button
                 onClick={startQuiz}
                 disabled={!course}
-                className="bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] text-white transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/30 active:scale-[0.98]"
+                className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] rounded-sm transition-all duration-300 active:scale-[0.98]"
               >
                 התחל מבחן תרגול
               </Button>
@@ -218,7 +218,7 @@ export default function QuizPage() {
 
         {stage === "generating" && (
           <div className="flex flex-col items-center gap-3 text-neutral-400 text-sm py-16">
-            <Loader2 className="animate-spin text-[#7c5cff]" size={28} />
+            <Loader2 className="animate-spin text-[#b08d57]" size={28} />
             המורה הפרטי בונה עבורך מבחן מותאם אישית מתוך חומר הקורס...
           </div>
         )}
@@ -233,11 +233,11 @@ export default function QuizPage() {
             </div>
 
             {stage === "graded" && result && (
-              <Card className="quiz-score-card glass-panel border-[#7c5cff]/40 text-white shadow-xl shadow-black/30">
+              <Card className="quiz-score-card glass-panel border-[#b08d57]/40 text-white shadow-xl shadow-black/30">
                 <CardContent className="p-5 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-neutral-400">תוצאה סופית</p>
-                    <p className="gradient-text text-3xl font-black">
+                    <p className="font-serif gold-text text-3xl">
                       {Math.round(result.scorePercentage)}%
                     </p>
                   </div>
@@ -255,11 +255,11 @@ export default function QuizPage() {
                 return (
                   <Card
                     key={q.id}
-                    className="quiz-question-card glass-panel border-[#29253f] text-white"
+                    className="quiz-question-card glass-panel border-[#332b1f] text-white"
                   >
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-start gap-2">
-                        <span className="text-[#7c5cff] shrink-0">שאלה {i + 1}.</span>
+                        <span className="text-[#b08d57] shrink-0">שאלה {i + 1}.</span>
                         <span className="font-normal text-neutral-100 flex-1">
                           <MarkdownMessage content={q.questionText} />
                         </span>
@@ -301,7 +301,7 @@ export default function QuizPage() {
                           }
                           disabled={disabled}
                           placeholder="כתוב את תשובתך כאן..."
-                          className="bg-[#1c1a2b] border-[#29253f] text-white focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff]"
+                          className="bg-[#211d16] border-[#332b1f] text-white focus-visible:ring-[#b08d57] focus-visible:border-[#b08d57]"
                         />
                       )}
 
@@ -332,13 +332,13 @@ export default function QuizPage() {
                 <Button
                   onClick={submitQuiz}
                   disabled={answeredCount === 0}
-                  className="bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] text-white transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/30 active:scale-[0.98]"
+                  className="bg-[#b08d57] hover:bg-[#d4b483] text-[#17140f] rounded-sm transition-all duration-300 active:scale-[0.98]"
                 >
                   הגש מבחן לבדיקה
                 </Button>
               )}
               {stage === "grading" && (
-                <Button disabled className="bg-[#29253f] text-neutral-400">
+                <Button disabled className="bg-[#332b1f] text-neutral-400">
                   <Loader2 className="animate-spin ml-2" size={16} />
                   בודק תשובות...
                 </Button>
@@ -346,7 +346,7 @@ export default function QuizPage() {
               {stage === "graded" && (
                 <Button
                   onClick={startQuiz}
-                  className="bg-[#1c1a2b] hover:bg-[#29253f] text-white border border-[#29253f] flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/10"
+                  className="bg-[#211d16] hover:bg-[#332b1f] text-white border border-[#332b1f] flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#b08d57]/10"
                 >
                   <RotateCcw size={14} />
                   מבחן תרגול נוסף
