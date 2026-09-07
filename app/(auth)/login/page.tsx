@@ -1,21 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { gsap, useGSAP } from "@/lib/gsap"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,6 +18,28 @@ export default function LoginPage() {
     username: "",
     password: "",
   })
+
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // One orchestrated entrance: the wordmark, then the subline, then the
+  // panel with the circuit-trace edge drawing itself, then the fields —
+  // in reading order, not a blanket fade-up on every element.
+  useGSAP(
+    () => {
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
+      tl.fromTo(".login-mark", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6 })
+        .fromTo(".login-sub", { opacity: 0 }, { opacity: 1, duration: 0.5 }, "-=0.25")
+        .fromTo(".login-trace", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.inOut" }, "-=0.2")
+        .fromTo(
+          ".login-field",
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 },
+          "-=0.35"
+        )
+        .fromTo(".login-cta", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5 }, "-=0.2")
+    },
+    { scope: rootRef }
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,7 +59,7 @@ export default function LoginPage() {
         router.push("/dashboard")
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError("אירעה שגיאה בהתחברות")
     } finally {
       setIsLoading(false)
@@ -52,25 +67,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] p-4" dir="rtl">
-      <Card className="w-full max-w-md bg-[#141414] text-white border-[#d4af37]/30 shadow-2xl shadow-[#d4af37]/10">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#FFD700] mb-2">
-            AI Student
-          </CardTitle>
-          <CardDescription className="text-neutral-400 text-lg">
-            הזן את פרטי ההתחברות שלך למערכת
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6 mt-4">
+    <div ref={rootRef} className="relative z-10 flex min-h-screen items-center justify-center p-4" dir="rtl">
+      <div className="w-full max-w-md">
+        <div className="login-mark text-center mb-2">
+          <h1 className="gradient-text text-5xl font-black tracking-tight">AI Student</h1>
+        </div>
+        <p className="login-sub text-center text-[#8d89ac] mb-8">
+          המורה הפרטי שלך, זמין בכל שעה
+        </p>
+
+        <div className="glass-panel border border-[#29253f] rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
+          <div className="login-trace h-[2px] w-full bg-gradient-to-l from-[#7c5cff] via-[#34e4ea] to-[#7c5cff] origin-right" />
+
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
             {error && (
-              <div className="bg-red-950/50 border border-red-800 text-red-200 px-4 py-3 rounded-lg text-sm text-center">
+              <div className="login-field bg-red-950/40 border border-red-800/60 text-red-200 px-4 py-3 rounded-lg text-sm text-center">
                 {error}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-neutral-300 text-md">
+
+            <div className="login-field space-y-2">
+              <Label htmlFor="username" className="text-[#c9c5e0] text-sm">
                 שם משתמש או אימייל
               </Label>
               <Input
@@ -79,13 +96,14 @@ export default function LoginPage() {
                 placeholder="yerahmiel"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-12"
+                className="bg-[#1c1a2b] border-[#29253f] text-white h-12 focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff] transition-shadow duration-300"
                 required
                 disabled={isLoading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-neutral-300 text-md">
+
+            <div className="login-field space-y-2">
+              <Label htmlFor="password" className="text-[#c9c5e0] text-sm">
                 סיסמה
               </Label>
               <Input
@@ -94,36 +112,37 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-12"
+                className="bg-[#1c1a2b] border-[#29253f] text-white h-12 focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff] transition-shadow duration-300"
                 required
                 disabled={isLoading}
               />
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-[#d4af37] hover:bg-[#FFD700] text-black h-12 text-lg font-semibold transition-colors"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  מתחבר...
-                </>
-              ) : (
-                "התחבר למערכת"
-              )}
-            </Button>
-            <div className="text-center text-sm text-neutral-400">
-              אין לך חשבון?{" "}
-              <Link href="/register" className="text-[#d4af37] hover:text-[#FFD700] font-medium">
-                הירשם כאן
-              </Link>
+
+            <div className="login-cta space-y-4 pt-2">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-12 text-base font-semibold text-white bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/40 active:scale-[0.98]"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    מתחבר...
+                  </>
+                ) : (
+                  "התחבר למערכת"
+                )}
+              </Button>
+              <div className="text-center text-sm text-[#8d89ac]">
+                אין לך חשבון?{" "}
+                <Link href="/register" className="text-[#9b82ff] hover:text-[#34e4ea] font-medium transition-colors">
+                  הירשם כאן
+                </Link>
+              </div>
             </div>
-          </CardFooter>
-        </form>
-      </Card>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }

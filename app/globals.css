@@ -1,13 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "katex/dist/katex.min.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-heebo);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -46,52 +47,58 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-  --color-gold: var(--gold);
-  --color-gold-bright: var(--gold-bright);
+  --color-violet: var(--violet);
+  --color-violet-bright: var(--violet-bright);
+  --color-cyan: var(--cyan);
+  --color-amber: var(--amber);
 }
 
 /*
-  Luxury "Black & Gold" theme.
-  Deep charcoal/black surfaces (#0a0a0a), gold/amber accents
-  (#d4af37 / #FFD700), soft light-grey text. Applied as the default
-  (:root) palette so the shared component layer is themed too.
+  "Living Equations" theme — a 2026 AI-tutor identity, deliberately moved
+  off the generic near-black-plus-single-accent default: a cool violet-black
+  canvas with a considered two-accent system (electric violet for AI/brand
+  moments, cyan for motion/data/thinking states) plus a warm amber reserved
+  for achievement (correct answers, completed progress) — never used for
+  brand chrome, so it stays legible as a signal.
 */
 :root {
-  --gold: #d4af37;
-  --gold-bright: #ffd700;
+  --violet: #7c5cff;
+  --violet-bright: #9b82ff;
+  --cyan: #34e4ea;
+  --amber: #ffb84d;
 
-  --background: #0a0a0a;
-  --foreground: #f5f5f5;
-  --card: #141414;
-  --card-foreground: #f5f5f5;
-  --popover: #141414;
-  --popover-foreground: #f5f5f5;
-  --primary: #d4af37;
-  --primary-foreground: #0a0a0a;
-  --secondary: #1f1f1f;
-  --secondary-foreground: #f5f5f5;
-  --muted: #1a1a1a;
-  --muted-foreground: #a3a3a3;
-  --accent: #2a2410;
-  --accent-foreground: #ffd700;
+  --background: #0a0a12;
+  --foreground: #f3f1fa;
+  --card: #14131f;
+  --card-foreground: #f3f1fa;
+  --popover: #14131f;
+  --popover-foreground: #f3f1fa;
+  --primary: #7c5cff;
+  --primary-foreground: #0a0a12;
+  --secondary: #1c1a2b;
+  --secondary-foreground: #f3f1fa;
+  --muted: #171623;
+  --muted-foreground: #8d89ac;
+  --accent: #221c3d;
+  --accent-foreground: #9b82ff;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #2a2a2a;
-  --input: #1f1f1f;
-  --ring: #d4af37;
-  --chart-1: #d4af37;
-  --chart-2: #ffd700;
-  --chart-3: #b8902a;
-  --chart-4: #8a6d20;
-  --chart-5: #5c4915;
-  --radius: 0.625rem;
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #f5f5f5;
-  --sidebar-primary: #d4af37;
-  --sidebar-primary-foreground: #0a0a0a;
-  --sidebar-accent: #1f1f1f;
-  --sidebar-accent-foreground: #ffd700;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #d4af37;
+  --border: #29253f;
+  --input: #1c1a2b;
+  --ring: #7c5cff;
+  --chart-1: #7c5cff;
+  --chart-2: #34e4ea;
+  --chart-3: #ffb84d;
+  --chart-4: #9b82ff;
+  --chart-5: #5c4ecb;
+  --radius: 0.75rem;
+  --sidebar: #0d0c17;
+  --sidebar-foreground: #f3f1fa;
+  --sidebar-primary: #7c5cff;
+  --sidebar-primary-foreground: #0a0a12;
+  --sidebar-accent: #1c1a2b;
+  --sidebar-accent-foreground: #9b82ff;
+  --sidebar-border: #29253f;
+  --sidebar-ring: #7c5cff;
 }
 
 .dark {
@@ -133,9 +140,103 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
-  html {
-    @apply font-sans;
+}
+
+/*
+  Signature motif: "living equations" drifting behind glass panels, plus
+  the motion/utility primitives GSAP timelines hook into. Elements marked
+  [data-reveal] start invisible so the entrance timeline (see lib/motion)
+  can animate them in without a flash of unstyled content; if JS never
+  runs (disabled, or prefers-reduced-motion), the fallback rule below
+  restores full visibility so the page is never stuck blank.
+*/
+@layer utilities {
+  .glass-panel {
+    background: rgba(20, 19, 31, 0.62);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
+
+  .gradient-text {
+    background: linear-gradient(100deg, var(--violet-bright), var(--cyan) 70%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.25), 0 16px 40px -16px rgba(124, 92, 255, 0.45);
+  }
+
+  [data-reveal] {
+    opacity: 0;
+  }
+
+  .typing-dot {
+    animation: typing-bounce 1.1s ease-in-out infinite;
+  }
+
+  /* A new item arriving in a live list (a chat bubble) — functional
+     motion, not decoration: it marks "this is new" and plays once per
+     node since the list only ever appends. */
+  .msg-in {
+    animation: fade-in-up 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce), (scripting: none) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Belt-and-suspenders: if the motion script fails to load/execute for any
+   reason, don't leave the page permanently blank. */
+.motion-ready [data-reveal] {
+  will-change: transform, opacity;
+}
+
+/* Violet-tinted scrollbars, in place of the default browser chrome. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4a3f8a #14131f;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #14131f;
+}
+::-webkit-scrollbar-thumb {
+  background: #352c5c;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7c5cff;
+}
+
+/* KaTeX renders on the theme's dark surfaces — restyle its ink and give
+   display equations breathing room instead of colliding with prose. */
+.katex {
+  color: inherit;
+  font-size: 1.02em;
+}
+.katex-display {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }

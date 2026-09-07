@@ -2,26 +2,44 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { chat } from "@/lib/rag/chat"
+import { chatStream } from "@/lib/rag/chat"
 import { assertEmbeddingEnv, assertLlmEnv } from "@/lib/rag/clients"
+import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
 
 /**
  * Chat endpoint — drives the enterprise RAG pipeline (lib/rag/chat.ts):
  * embed the question (OpenAI) → retrieve from Pinecone (scoped to the
- * authenticated user + course) → answer with Anthropic Claude → persist the
- * turn in Postgres.
+ * authenticated user + course) → stream the answer from Anthropic Claude →
+ * persist the turn in Postgres.
  *
  * The browser only sends the message and which course it is asking about.
  * `userId` is taken from the authenticated session (never trusted from the
  * client), and a ChatSession is resolved/created server-side so the pipeline
  * has the `sessionId` it needs for conversational memory.
+ *
+ * The response body is newline-delimited JSON (NDJSON), one line per event:
+ *   {"type":"sources","chunks":[...],"sessionId":"..."}
+ *   {"type":"delta","text":"..."}         (repeated per token)
+ *   {"type":"done"}
+ *   {"type":"error","message":"..."}      (only if something fails mid-stream)
+ * Plain JSON error responses are used for anything that fails BEFORE the
+ * stream starts (auth, validation, rate limit) — those can still use normal
+ * HTTP status codes since no bytes have been sent yet.
  */
+
+// pg-backed Prisma isn't edge-compatible, and the Anthropic stream needs the
+// Node.js runtime's longer execution model.
+export const runtime = "nodejs"
 
 type ChatRequestBody = {
   message?: unknown
   courseCode?: unknown
   courseId?: unknown
   sessionId?: unknown
+}
+
+function ndjson(obj: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(obj) + "\n")
 }
 
 export async function POST(req: Request) {
@@ -40,6 +58,20 @@ export async function POST(req: Request) {
     // The tutor persona greets the student by name. Prefer the full name, fall
     // back to the username, then to a neutral Hebrew default.
     const userName = session?.user?.fullName || session?.user?.username || "סטודנט"
+
+    // 1b. Bound cost exposure — a coarse daily cap per user before any paid
+    // API call is made. See lib/rate-limit.ts.
+    try {
+      await assertUnderDailyLimit(userId, "chat")
+    } catch (error) {
+      if (error instanceof RateLimitExceededError) {
+        return NextResponse.json(
+          { error: "הגעת למכסת ההודעות היומית שלך. נסה שוב מחר." },
+          { status: 429 }
+        )
+      }
+      throw error
+    }
 
     // 2. Validate required keys up front (throws a precise, catchable error).
     assertEmbeddingEnv()
@@ -97,27 +129,71 @@ export async function POST(req: Request) {
       })
     }
 
-    // 6. Run the full RAG turn.
-    const reply = await chat({
-      userId,
-      userName,
-      courseId: course.id,
-      sessionId: chatSession.id,
-      message,
+    // 6. Run the full RAG turn as a stream, forwarding each event to the
+    // client as an NDJSON line. Once this ReadableStream starts, headers are
+    // already committed — any failure from here on must be encoded as an
+    // {"type":"error"} line, never a thrown error (the client would just see
+    // a truncated response).
+    const sessionId = chatSession.id
+
+    // Propagates a client disconnect (the "stop" button, or the browser tab
+    // closing) down to the Anthropic call itself — without this, an aborted
+    // fetch on the client still burns tokens on the server until the model
+    // finishes its full response (confirmed via manual testing: the request
+    // kept running ~19s after the client had already disconnected).
+    const abortController = new AbortController()
+    let closed = false
+    const responseBody = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const safeEnqueue = (obj: unknown) => {
+          if (closed) return
+          controller.enqueue(ndjson(obj))
+        }
+        try {
+          for await (const event of chatStream({
+            userId,
+            userName,
+            courseId: course.id,
+            sessionId,
+            message,
+            signal: abortController.signal,
+          })) {
+            if (closed) break
+            if (event.type === "sources") {
+              safeEnqueue({ type: "sources", chunks: event.chunks, sessionId })
+            } else if (event.type === "delta") {
+              safeEnqueue({ type: "delta", text: event.text })
+            } else {
+              safeEnqueue({ type: "done" })
+            }
+          }
+        } catch (error) {
+          // A client-initiated abort surfaces here as an APIUserAbortError —
+          // that's expected, not a failure, so it gets no error line.
+          if (!abortController.signal.aborted) {
+            console.error("[CRITICAL_ERROR] /api/chat stream failed:", error)
+            const message = error instanceof Error ? error.message : "Unexpected server error during chat"
+            safeEnqueue({ type: "error", message })
+          }
+        } finally {
+          if (!closed) {
+            closed = true
+            controller.close()
+          }
+        }
+      },
+      cancel() {
+        closed = true
+        abortController.abort()
+      },
     })
 
     // Pin the charset explicitly. The body bytes are already UTF-8, but some
     // clients/proxies fall back to latin-1 when no charset is declared, which
     // turns Hebrew (and math symbols) into gibberish on the wire.
-    return NextResponse.json(
-      {
-        text: reply.answer,
-        answer: reply.answer,
-        chunks: reply.chunks,
-        sessionId: chatSession.id,
-      },
-      { headers: { "Content-Type": "application/json; charset=utf-8" } }
-    )
+    return new Response(responseBody, {
+      headers: { "Content-Type": "application/x-ndjson; charset=utf-8" },
+    })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/chat failed:", error)
     const message =

@@ -85,6 +85,7 @@ model User {
   documents     Document[]
   chatSessions  ChatSession[]
   createdCourses Course[]      @relation("CreatedCourses")
+  usageCounters UsageCounter[]
 
   @@index([email])
   @@index([username])
@@ -154,12 +155,39 @@ model QuizAttempt {
   attemptedAt      DateTime  @default(now())
 
   // Relations
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
 
   @@index([userId])
   @@index([courseId])
   @@map("quiz_attempts")
+}
+
+// Question-level detail for a QuizAttempt: the generated question, the
+// student's answer, and Claude's grading/feedback. `correctAnswer` is
+// withheld from the client until the attempt is submitted for grading.
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  quizAttemptId String
+  order         Int
+  type          String // "mcq" | "short"
+  questionText  String
+  choices       Json? // string[] for "mcq"
+  correctAnswer String?
+  topic         String? // short tag powering weak-topic tracking in the chat feedback loop
+  sourceChunks  Json? // [{documentId, fileName, chunkIndex}] citations from retrieval
+  studentAnswer String?
+  isCorrect     Boolean?
+  score         Float? // 0..1, partial credit for short answers
+  feedback      String? // Claude's specific "what to improve" text
+  createdAt     DateTime @default(now())
+
+  quizAttempt QuizAttempt @relation(fields: [quizAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([quizAttemptId])
+  @@index([quizAttemptId, isCorrect])
+  @@map("quiz_questions")
 }
 
 model LearningSession {
@@ -180,6 +208,23 @@ model LearningSession {
   @@index([courseId])
   @@index([sessionStart])
   @@map("learning_sessions")
+}
+
+// Coarse daily quota tracking for cost control. One row per (userId, day);
+// incremented atomically on every chat/upload request. See lib/rate-limit.ts.
+model UsageCounter {
+  id          String   @id @default(cuid())
+  userId      String
+  day         DateTime // truncated to midnight UTC
+  chatCount   Int      @default(0)
+  uploadCount Int      @default(0)
+  quizCount   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([userId])
+  @@map("usage_counters")
 }
 
 // =====================================================

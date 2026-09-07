@@ -27,6 +27,16 @@ export const EMBEDDING_DIMENSIONS = 1536
 export const CHAT_MODEL = "claude-sonnet-4-6"
 
 /**
+ * Escalation model for the "hard" path (see classifyComplexity in
+ * lib/rag/chat.ts): adaptive thinking + code execution already buy most of
+ * the accuracy improvement on hard math/EE/CS problems, but Opus is a
+ * materially stronger reasoner than Sonnet on the genuinely hardest
+ * problems. Only ever used on the low-volume hard path, so the extra cost
+ * is bounded to exactly the turns that need it.
+ */
+export const HARD_CHAT_MODEL = "claude-opus-4-6"
+
+/**
  * Metadata stored on every Pinecone vector. `userId` + `courseId` are the
  * strict multi-tenancy keys: every vector carries them and every query filters
  * on them (see chat.ts) to prevent cross-tenant data leakage.

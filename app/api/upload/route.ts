@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ingestDocument } from "@/lib/rag/ingest"
 import { assertEmbeddingEnv } from "@/lib/rag/clients"
+import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
 
 /**
  * Document ingestion endpoint.
@@ -83,7 +84,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // 1b. Validate required keys up front (throws a precise, catchable error
+    // 1b. Bound cost exposure — a coarse daily cap per user before any paid
+    // API call is made. See lib/rate-limit.ts.
+    try {
+      await assertUnderDailyLimit(userId, "upload")
+    } catch (error) {
+      if (error instanceof RateLimitExceededError) {
+        return NextResponse.json(
+          { error: "הגעת למכסת ההעלאות היומית שלך. נסה שוב מחר." },
+          { status: 429 }
+        )
+      }
+      throw error
+    }
+
+    // 1c. Validate required keys up front (throws a precise, catchable error
     //     naming the missing key — embedding + vector storage need these).
     assertEmbeddingEnv()
 

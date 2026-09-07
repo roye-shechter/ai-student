@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
 import { MarkdownMessage } from "@/components/markdown-message"
+import { SourceCitations, type SourceChunk } from "@/components/chat/source-citations"
+import { gsap, useGSAP } from "@/lib/gsap"
 import {
-  UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock,
+  UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock, Square, RotateCcw, GraduationCap,
 } from "lucide-react"
 
 type CourseInfo = {
@@ -28,11 +30,17 @@ type CourseDocument = {
   createdAt: string
 }
 
-type ChatMessage = { role: string; text: string }
+type ChatMessage = { role: string; text: string; chunks?: SourceChunk[] }
+
+type ChatStreamEvent =
+  | { type: "sources"; chunks: SourceChunk[]; sessionId: string }
+  | { type: "delta"; text: string }
+  | { type: "done" }
+  | { type: "error"; message: string }
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
-  indexed: { label: "מאונדקס", className: "text-green-400" },
-  processing: { label: "מעבד", className: "text-[#d4af37]" },
+  indexed: { label: "מאונדקס", className: "text-emerald-400" },
+  processing: { label: "מעבד", className: "text-[#9b82ff]" },
   pending: { label: "ממתין", className: "text-neutral-400" },
   failed: { label: "נכשל", className: "text-red-400" },
 }
@@ -46,6 +54,23 @@ function StatusBadge({ status }: { status: string }) {
       <Icon size={12} className={status === "processing" ? "animate-spin" : ""} />
       {meta.label}
     </span>
+  )
+}
+
+/** The tutor's "thinking" state — a three-dot wave rather than a bare
+ * spinner, so waiting for the AI reads as a distinct, branded moment. */
+function ThinkingIndicator() {
+  return (
+    <div className="flex gap-3 ml-auto items-center text-neutral-400 text-sm">
+      <div className="p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 bg-[#1c1a2b] text-[#9b82ff]">
+        <Bot size={16} />
+      </div>
+      <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl rounded-tr-none bg-[#1c1a2b]">
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#7c5cff]" style={{ animationDelay: "0ms" }} />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#9b82ff]" style={{ animationDelay: "150ms" }} />
+        <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#34e4ea]" style={{ animationDelay: "300ms" }} />
+      </div>
+    </div>
   )
 }
 
@@ -64,11 +89,27 @@ export default function CoursePage() {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [streamStarted, setStreamStarted] = useState(false)
+  const [chatError, setChatError] = useState<{ message: string; retryText: string } | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useGSAP(
+    () => {
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
+      tl.fromTo(".course-header", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.5 })
+        .fromTo(".course-info-card", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5 }, "-=0.2")
+        .fromTo(".course-docs-card", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5 }, "-=0.3")
+        .fromTo(".course-chat-card", { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.5 }, "-=0.4")
+    },
+    { scope: rootRef }
+  )
 
   // Load the course's display info + this user's previously uploaded documents.
   const loadDocuments = useCallback(async () => {
@@ -134,49 +175,124 @@ export default function CoursePage() {
     if (file) handleUpload(file)
   }
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return
-    const userMessage = { role: "user", text: input }
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsLoading(true)
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input, courseCode, sessionId }),
-      })
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return
+      setChatError(null)
+      setMessages((prev) => [...prev, { role: "user", text }])
+      setIsLoading(true)
+      setStreamStarted(false)
 
-      // Guard against non-JSON (HTML error page) responses so a server crash
-      // surfaces the backend error instead of throwing "Unexpected token '<'".
-      const data = await readJson<{ text?: string; sessionId?: string; error?: string }>(response)
-      if (!response.ok || !data) {
-        throw new Error(
-          data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
-        )
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
+      // Tracks whether we've already pushed the assistant bubble for this
+      // turn (created lazily on the first "sources" event, since sources
+      // arrive before the first token — see app/api/chat/route.ts).
+      let assistantMessagePushed = false
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({ message: text, courseCode, sessionId }),
+        })
+
+        if (!response.ok || !response.body) {
+          // Failures before the stream starts (auth, rate limit, validation)
+          // come back as plain JSON, not NDJSON.
+          const data = await readJson<{ error?: string }>(response)
+          throw new Error(
+            data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
+          )
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() ?? ""
+
+          for (const line of lines) {
+            if (!line.trim()) continue
+            const event = JSON.parse(line) as ChatStreamEvent
+
+            if (event.type === "sources") {
+              setSessionId(event.sessionId)
+              assistantMessagePushed = true
+              setMessages((prev) => [...prev, { role: "assistant", text: "", chunks: event.chunks }])
+            } else if (event.type === "delta") {
+              setStreamStarted(true)
+              setMessages((prev) => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                next[next.length - 1] = { ...last, text: last.text + event.text }
+                return next
+              })
+            } else if (event.type === "error") {
+              throw new Error(event.message)
+            }
+            // "done" needs no action — isLoading is cleared in `finally`.
+          }
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          // User pressed "stop" — keep whatever partial answer streamed in.
+        } else {
+          const message = error instanceof Error ? error.message : "מתקשה להתחבר לשרת ה-AI."
+          if (assistantMessagePushed) {
+            // Drop the empty/partial bubble only if it never received any text.
+            setMessages((prev) => {
+              const last = prev[prev.length - 1]
+              return last?.role === "assistant" && last.text === "" ? prev.slice(0, -1) : prev
+            })
+          }
+          setChatError({ message, retryText: text })
+        }
+      } finally {
+        setIsLoading(false)
+        setStreamStarted(false)
+        abortControllerRef.current = null
       }
+    },
+    [isLoading, courseCode, sessionId]
+  )
 
-      if (data.sessionId) setSessionId(data.sessionId)
-      setMessages((prev) => [...prev, { role: "assistant", text: data.text || "לא התקבלה תשובה תקינה." }])
-    } catch (error) {
-      const text = error instanceof Error ? error.message : "מתקשה להתחבר לשרת ה-AI."
-      setMessages((prev) => [...prev, { role: "assistant", text }])
-    } finally {
-      setIsLoading(false)
-    }
+  const handleSendMessage = () => {
+    if (!input.trim() || isLoading) return
+    const text = input
+    setInput("")
+    sendMessage(text)
+  }
+
+  const handleStop = () => {
+    abortControllerRef.current?.abort()
+  }
+
+  const handleRetry = () => {
+    if (!chatError) return
+    const { retryText } = chatError
+    setChatError(null)
+    sendMessage(retryText)
   }
 
   const courseTitle = course?.courseName ?? courseCode
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col" dir="rtl">
-      <div className="border-b border-[#2a2a2a] bg-[#141414]/50 p-4">
+    <div ref={rootRef} className="relative z-10 min-h-screen text-white flex flex-col" dir="rtl">
+      <div className="course-header border-b border-[#29253f] glass-panel p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-neutral-400 hover:text-[#d4af37] transition-colors text-sm">
+          <Link href="/dashboard" className="flex items-center gap-2 text-neutral-400 hover:text-[#9b82ff] transition-colors text-sm">
             <ArrowRight size={16} />
             חזרה לדשבורד הראשי
           </Link>
-          <span className="text-xs bg-[#2a2410] text-[#FFD700] border border-[#d4af37]/40 px-2 py-1 rounded">סביבת לימוד מבוססת AI</span>
+          <span className="text-xs bg-[#221c3d] text-[#9b82ff] border border-[#7c5cff]/40 px-2 py-1 rounded">סביבת לימוד מבוססת AI</span>
         </div>
       </div>
 
@@ -184,14 +300,20 @@ export default function CoursePage() {
 
         {/* חלק ימין: חומרי לימוד */}
         <div className="space-y-6 flex flex-col">
-          <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl p-6">
-            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#FFD700]">{courseTitle}</h1>
-            {course?.description && <p className="text-neutral-400 text-sm mt-1">{course.description}</p>}
+          <div className="course-info-card glass-panel border border-[#29253f] rounded-xl p-6 space-y-3">
+            <h1 className="gradient-text text-3xl font-black">{courseTitle}</h1>
+            {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
+            <Link href={`/dashboard/${courseCode}/quiz`} className="block">
+              <Button className="w-full bg-[#221c3d] hover:bg-[#2c2450] text-[#9b82ff] border border-[#7c5cff]/40 flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/20">
+                <GraduationCap size={16} />
+                התחל מבחן תרגול
+              </Button>
+            </Link>
           </div>
 
-          <Card className="bg-[#141414] border-[#2a2a2a] text-white flex-1 flex flex-col">
+          <Card className="course-docs-card glass-panel border-[#29253f] text-white flex-1 flex flex-col">
             <CardHeader>
-              <CardTitle className="text-lg text-[#d4af37] flex items-center gap-2">
+              <CardTitle className="text-lg text-[#9b82ff] flex items-center gap-2">
                 <UploadCloud size={20} />
                 חומרי קורס זה
               </CardTitle>
@@ -209,10 +331,10 @@ export default function CoursePage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="w-full border-2 border-dashed border-[#2a2a2a] rounded-lg p-6 text-center bg-[#0a0a0a]/40 transition-colors hover:border-[#d4af37]/50 hover:bg-[#0a0a0a]/70 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full border-2 border-dashed border-[#29253f] rounded-lg p-6 text-center bg-[#0a0a12]/40 transition-all duration-300 hover:border-[#7c5cff]/60 hover:bg-[#0a0a12]/70 hover:shadow-[0_0_20px_-4px_rgba(124,92,255,0.3)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
-                  <Loader2 size={28} className="mx-auto text-[#d4af37] mb-2 animate-spin" />
+                  <Loader2 size={28} className="mx-auto text-[#7c5cff] mb-2 animate-spin" />
                 ) : (
                   <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
                 )}
@@ -241,9 +363,9 @@ export default function CoursePage() {
                   documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center gap-2 p-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded text-xs text-neutral-300"
+                      className="flex items-center gap-2 p-2 bg-[#0a0a12] border border-[#29253f] rounded text-xs text-neutral-300"
                     >
-                      <FileText size={14} className="text-[#d4af37] shrink-0" />
+                      <FileText size={14} className="text-[#9b82ff] shrink-0" />
                       <span className="truncate flex-1">{doc.title}</span>
                       <span className="text-[10px] text-neutral-500 shrink-0">{doc.chunkCount} קטעים</span>
                       <StatusBadge status={doc.status} />
@@ -256,35 +378,61 @@ export default function CoursePage() {
         </div>
 
         {/* חלק שמאל: הצ'אט האמיתי */}
-        <Card className="bg-[#141414] border-[#2a2a2a] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-[#d4af37]/10">
-          <CardHeader className="border-b border-[#2a2a2a] pb-4">
+        <Card className="course-chat-card glass-panel border-[#29253f] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
+          <CardHeader className="border-b border-[#29253f] pb-4">
             <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Bot className="text-[#d4af37]" size={22} />
+              <Bot className="text-[#7c5cff]" size={22} />
               עוזר למידה אישי מבוסס מסמכים
             </CardTitle>
             <CardDescription className="text-neutral-400 text-xs">שאל כל דבר על החומר; ה-AI מונחה להשיב אך ורק מתוך מסמכי הקורס שהועלו.</CardDescription>
           </CardHeader>
 
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
-            {messages.map((msg, index) => (
-              <div key={index} className={`flex gap-3 max-w-[85%] ${msg.role === "user" ? "mr-auto flex-row-reverse" : "ml-auto"}`}>
-                <div className={`p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-[#d4af37] text-black" : "bg-[#1f1f1f] text-[#d4af37]"}`}>
-                  {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
+            {messages.map((msg, index) => {
+              const isStreamingThisMessage = isLoading && streamStarted && index === messages.length - 1 && msg.role === "assistant"
+              return (
+                <div key={index} className={`msg-in flex gap-3 max-w-[85%] ${msg.role === "user" ? "mr-auto flex-row-reverse" : "ml-auto"}`}>
+                  <div className={`p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-gradient-to-br from-[#7c5cff] to-[#5a3fd6] text-white" : "bg-[#1c1a2b] text-[#9b82ff]"}`}>
+                    {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
+                  </div>
+                  <div className={`p-3 rounded-xl text-sm leading-relaxed ${msg.role === "user" ? "bg-gradient-to-br from-[#7c5cff] to-[#5a3fd6] text-white rounded-tl-none text-left" : "bg-[#1c1a2b] text-neutral-100 rounded-tr-none"}`}>
+                    {msg.role === "user" ? (
+                      msg.text
+                    ) : (
+                      <>
+                        <MarkdownMessage content={msg.text} />
+                        {isStreamingThisMessage && (
+                          <span className="inline-block w-1.5 h-4 bg-[#34e4ea] animate-pulse align-middle ml-1" />
+                        )}
+                        {msg.chunks && <SourceCitations chunks={msg.chunks} />}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className={`p-3 rounded-xl text-sm leading-relaxed ${msg.role === "user" ? "bg-[#d4af37] text-black rounded-tl-none text-left" : "bg-[#1f1f1f] text-neutral-100 rounded-tr-none"}`}>
-                  {msg.role === "user" ? msg.text : <MarkdownMessage content={msg.text} />}
+              )
+            })}
+            {isLoading && !streamStarted && <ThinkingIndicator />}
+            {chatError && (
+              <div className="flex gap-3 ml-auto max-w-[85%] items-start">
+                <div className="p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 bg-[#2a1414] text-red-400">
+                  <AlertCircle size={16} />
                 </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex gap-3 ml-auto items-center text-neutral-400 text-sm">
-                <Loader2 className="animate-spin text-[#d4af37]" size={18} />
-                המורה הפרטי חושב...
+                <div className="p-3 rounded-xl rounded-tr-none text-sm leading-relaxed bg-[#2a1414] text-red-300 border border-red-900/50 flex flex-col gap-2">
+                  <span>{chatError.message}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="self-start flex items-center gap-1 text-xs text-red-200 hover:text-white bg-red-900/40 hover:bg-red-900/70 border border-red-800 rounded px-2 py-1 transition-colors"
+                  >
+                    <RotateCcw size={12} />
+                    נסה שוב
+                  </button>
+                </div>
               </div>
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-[#2a2a2a] p-4 bg-[#0a0a0a]/20">
+          <CardFooter className="border-t border-[#29253f] p-4 bg-[#0a0a12]/20">
             <div className="flex w-full gap-2 items-center">
               <Input
                 type="text"
@@ -292,12 +440,18 @@ export default function CoursePage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                className="bg-[#1f1f1f] border-[#2a2a2a] text-white focus-visible:ring-[#d4af37] focus-visible:border-[#d4af37] h-12 flex-1"
+                className="bg-[#1c1a2b] border-[#29253f] text-white focus-visible:ring-[#7c5cff] focus-visible:border-[#7c5cff] h-12 flex-1 transition-shadow duration-300 focus-visible:shadow-[0_0_16px_-2px_rgba(124,92,255,0.4)]"
                 disabled={isLoading}
               />
-              <Button onClick={handleSendMessage} disabled={isLoading} className="bg-[#d4af37] hover:bg-[#FFD700] text-black h-12 px-4 transition-colors">
-                <Send size={18} className="rotate-180" />
-              </Button>
+              {isLoading ? (
+                <Button onClick={handleStop} className="bg-[#29253f] hover:bg-red-900/50 text-white h-12 px-4 transition-all duration-300">
+                  <Square size={16} />
+                </Button>
+              ) : (
+                <Button onClick={handleSendMessage} className="bg-gradient-to-l from-[#7c5cff] to-[#5a3fd6] hover:from-[#8f70ff] hover:to-[#6b4ee8] text-white h-12 px-4 transition-all duration-300 hover:shadow-lg hover:shadow-[#7c5cff]/30 active:scale-95">
+                  <Send size={18} className="rotate-180" />
+                </Button>
+              )}
             </div>
           </CardFooter>
         </Card>
