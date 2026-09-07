@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { generateQuiz } from "@/lib/rag/quiz"
 import { assertEmbeddingEnv, assertLlmEnv } from "@/lib/rag/clients"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
+import { recordActivity } from "@/lib/learning-session"
 
 /**
  * Quiz generation endpoint — same shape as /api/upload and /api/chat: auth →
@@ -74,6 +75,10 @@ export async function POST(
         correctAnswer: q.correctAnswer,
         topic: q.topic,
       })),
+    })
+
+    recordActivity(userId, course.id, "quiz").catch((error) => {
+      console.error("[non-fatal] recordActivity failed:", error)
     })
 
     // Never send correctAnswer to the client before grading.

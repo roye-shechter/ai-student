@@ -5,24 +5,33 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ingestDocument } from "@/lib/rag/ingest"
 import { assertEmbeddingEnv } from "@/lib/rag/clients"
+import { transcribeAudio } from "@/lib/rag/transcribe"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
 
 /**
  * Document ingestion endpoint.
  *
- * Accepts a multipart file upload (PDF or TXT), authenticates the user,
- * extracts the raw text, records a Document row in Postgres, then hands the
- * text to the RAG ingestion pipeline (lib/rag/ingest.ts) which chunks,
- * embeds (OpenAI), and upserts the vectors into Pinecone — tagged with the
- * authenticated userId + the resolved courseId for strict tenant isolation.
+ * Accepts a multipart file upload (PDF, TXT, or an audio lecture recording),
+ * authenticates the user, extracts the raw text (transcribing audio via
+ * lib/rag/transcribe.ts when applicable), records a Document row in
+ * Postgres, then hands the text to the RAG ingestion pipeline
+ * (lib/rag/ingest.ts) which chunks, embeds (OpenAI), and upserts the
+ * vectors into Pinecone — tagged with the authenticated userId + the
+ * resolved courseId for strict tenant isolation. A lecture recording flows
+ * through the exact same downstream pipeline as a PDF once it's text.
  */
 
 // pdf2json requires the Node.js runtime (node:stream / Buffer) — not edge.
 export const runtime = "nodejs"
 
-const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
+const MAX_BYTES = 15 * 1024 * 1024 // 15 MB (PDF/TXT)
+// OpenAI's transcription endpoint hard-caps uploads at 25MB; stay under it.
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024 // 24 MB
 const PDF_TYPES = ["application/pdf"]
 const TXT_TYPES = ["text/plain"]
+// Formats OpenAI's transcription endpoint accepts.
+const AUDIO_TYPES = ["audio/mpeg", "audio/mp3", "audio/mp4", "audio/wav", "audio/webm", "audio/m4a", "audio/x-m4a", "video/mp4", "video/webm"]
+const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"]
 
 function isPdf(file: File): boolean {
   return PDF_TYPES.includes(file.type) || file.name.toLowerCase().endsWith(".pdf")
@@ -30,6 +39,10 @@ function isPdf(file: File): boolean {
 
 function isTxt(file: File): boolean {
   return TXT_TYPES.includes(file.type) || file.name.toLowerCase().endsWith(".txt")
+}
+
+function isAudio(file: File): boolean {
+  return AUDIO_TYPES.includes(file.type) || AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
 }
 
 /** decodeURIComponent that never throws on malformed/partial escape sequences. */
@@ -117,14 +130,18 @@ export async function POST(req: Request) {
     if (file.size === 0) {
       return NextResponse.json({ error: "File is empty" }, { status: 400 })
     }
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 413 })
-    }
-    if (!isPdf(file) && !isTxt(file)) {
+    if (!isPdf(file) && !isTxt(file) && !isAudio(file)) {
       return NextResponse.json(
-        { error: "Unsupported file type (PDF or TXT only)" },
+        { error: "Unsupported file type (PDF, TXT, or an audio lecture recording)" },
         { status: 415 }
       )
+    }
+    const audio = isAudio(file)
+    if (audio && file.size > MAX_AUDIO_BYTES) {
+      return NextResponse.json({ error: "Audio file too large (max 24MB)" }, { status: 413 })
+    }
+    if (!audio && file.size > MAX_BYTES) {
+      return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 413 })
     }
 
     // 3. Resolve the course this material belongs to.
@@ -144,25 +161,36 @@ export async function POST(req: Request) {
       )
     }
 
-    // 4. Extract raw text.
-    const bytes = new Uint8Array(await file.arrayBuffer())
+    // 4. Extract raw text — transcribe audio, or read PDF/TXT bytes directly.
     let text: string
     try {
-      text = isPdf(file) ? await extractPdfText(bytes) : new TextDecoder("utf-8").decode(bytes)
+      if (audio) {
+        text = await transcribeAudio(file)
+      } else {
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        text = isPdf(file) ? await extractPdfText(bytes) : new TextDecoder("utf-8").decode(bytes)
+      }
     } catch (error) {
-      console.error("Text extraction failed:", error)
-      return NextResponse.json({ error: "Failed to read the document" }, { status: 422 })
+      console.error(audio ? "Audio transcription failed:" : "Text extraction failed:", error)
+      return NextResponse.json(
+        { error: audio ? "תמלול ההקלטה נכשל" : "Failed to read the document" },
+        { status: 422 }
+      )
     }
 
     if (!text.trim()) {
       return NextResponse.json(
-        { error: "No extractable text found (scanned/image-only PDFs are not supported)" },
+        {
+          error: audio
+            ? "לא זוהה דיבור בהקלטה"
+            : "No extractable text found (scanned/image-only PDFs are not supported)",
+        },
         { status: 422 }
       )
     }
 
     // 5. Record the document, then run the ingestion pipeline.
-    const fileType = isPdf(file) ? "pdf" : "txt"
+    const fileType = audio ? "audio" : isPdf(file) ? "pdf" : "txt"
     const document = await prisma.document.create({
       data: {
         userId,

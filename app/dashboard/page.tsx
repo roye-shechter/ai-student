@@ -6,24 +6,11 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { BookOpen, PlayCircle, Loader2, Sparkles, Plus, Award } from "lucide-react"
+import { BookOpen, PlayCircle, Loader2, Sparkles, Plus, Award, TrendingUp, Target } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import { CreateCourseDialog } from "@/components/create-course-dialog"
 import { readJson } from "@/lib/http"
 import { gsap, useGSAP } from "@/lib/gsap"
-
-const barData = [
-  { name: "שבוע 1", hours: 12 },
-  { name: "שבוע 2", hours: 19 },
-  { name: "שבוע 3", hours: 15 },
-  { name: "שבוע 4", hours: 22 },
-  { name: "שבוע 5", hours: 28 },
-]
-
-const pieData = [
-  { name: "נלמד", value: 70, color: "#7c5cff" },
-  { name: "נותר ללמוד", value: 30, color: "#29253f" },
-]
 
 type Me = { onboardingCompleted: boolean; institution: string | null }
 
@@ -32,12 +19,20 @@ type Enrollment = {
   course: { id: string; courseCode: string; courseName: string; description: string | null; credits: number }
 }
 
+type ProgressSummary = {
+  weeklyHours: { name: string; hours: number }[]
+  averageScore: number | null
+  attemptCount: number
+  weakTopics: { topic: string; count: number }[]
+}
+
 export default function Dashboard() {
   const { data: session } = useSession()
   const displayName = session?.user?.fullName || session?.user?.username || "אורח"
 
   const [me, setMe] = useState<Me | null>(null)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
+  const [progress, setProgress] = useState<ProgressSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateCourse, setShowCreateCourse] = useState(false)
 
@@ -45,11 +40,17 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [meRes, enrRes] = await Promise.all([fetch("/api/me"), fetch("/api/enrollments")])
+      const [meRes, enrRes, progRes] = await Promise.all([
+        fetch("/api/me"),
+        fetch("/api/enrollments"),
+        fetch("/api/progress/summary"),
+      ])
       const meData = await readJson<Me>(meRes)
       if (meRes.ok && meData) setMe(meData)
       const enrData = await readJson<{ enrollments?: Enrollment[] }>(enrRes)
       if (enrRes.ok && enrData) setEnrollments(enrData.enrollments ?? [])
+      const progData = await readJson<ProgressSummary>(progRes)
+      if (progRes.ok && progData) setProgress(progData)
     } finally {
       setLoading(false)
     }
@@ -112,6 +113,15 @@ export default function Dashboard() {
   }
 
   const showOnboarding = !loading && me !== null && !me.onboardingCompleted
+
+  const totalHours = progress?.weeklyHours.reduce((sum, w) => sum + w.hours, 0) ?? 0
+  const hasHoursData = totalHours > 0
+  const hasScoreData = (progress?.attemptCount ?? 0) > 0
+  const avgScore = Math.round(progress?.averageScore ?? 0)
+  const scorePieData = [
+    { name: "רמת הבנה", value: avgScore, color: "#7c5cff" },
+    { name: "נותר לחזק", value: 100 - avgScore, color: "#29253f" },
+  ]
 
   return (
     <div ref={rootRef} className="relative z-10 min-h-screen text-[#f3f1fa] p-8" dir="rtl">
@@ -224,43 +234,92 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* אזור הגרפים */}
+        {/* אזור האנליטיקה */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#29253f]">
           <Card className="dash-chart-card glass-panel border-[#29253f] text-white shadow-xl shadow-black/20">
             <CardHeader>
-              <CardTitle className="text-[#9b82ff]">שעות למידה שבועיות</CardTitle>
+              <CardTitle className="text-[#9b82ff] flex items-center gap-2">
+                <TrendingUp size={18} />
+                שעות למידה שבועיות
+              </CardTitle>
             </CardHeader>
             <CardContent className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#29253f" />
-                  <XAxis dataKey="name" stroke="#8d89ac" />
-                  <YAxis stroke="#8d89ac" />
-                  <Tooltip contentStyle={{ backgroundColor: '#14131f', borderColor: '#7c5cff', color: '#fff' }} cursor={{ fill: '#ffffff10' }} />
-                  <Bar dataKey="hours" fill="#7c5cff" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {!loading && !hasHoursData ? (
+                <div className="h-full flex flex-col items-center justify-center text-center text-[#8d89ac] text-sm gap-2">
+                  <TrendingUp size={24} className="text-[#7c5cff]/50" />
+                  עדיין אין נתוני זמן למידה. שיחה או מבחן תרגול ראשונים יופיעו כאן.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={progress?.weeklyHours ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#29253f" />
+                    <XAxis dataKey="name" stroke="#8d89ac" />
+                    <YAxis stroke="#8d89ac" />
+                    <Tooltip contentStyle={{ backgroundColor: '#14131f', borderColor: '#7c5cff', color: '#fff' }} cursor={{ fill: '#ffffff10' }} />
+                    <Bar dataKey="hours" fill="#7c5cff" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
           <Card className="dash-chart-card glass-panel border-[#29253f] text-white shadow-xl shadow-black/20">
             <CardHeader>
-              <CardTitle className="text-[#9b82ff]">התקדמות כללית</CardTitle>
+              <CardTitle className="text-[#9b82ff] flex items-center gap-2">
+                <Target size={18} />
+                רמת הבנה ממוצעת (לפי מבחני תרגול)
+              </CardTitle>
             </CardHeader>
             <CardContent className="h-64 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#14131f', borderColor: '#7c5cff', color: '#fff' }} />
-                </PieChart>
-              </ResponsiveContainer>
+              {!loading && !hasScoreData ? (
+                <div className="h-full flex flex-col items-center justify-center text-center text-[#8d89ac] text-sm gap-2 px-4">
+                  <Target size={24} className="text-[#7c5cff]/50" />
+                  עדיין לא ביצעת מבחן תרגול. נסה אחד בעמוד של קורס כדי לראות כאן את רמת ההבנה שלך.
+                </div>
+              ) : (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={scorePieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {scorePieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: '#14131f', borderColor: '#7c5cff', color: '#fff' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black text-white">{avgScore}%</span>
+                    <span className="text-[10px] text-[#8d89ac]">{progress?.attemptCount} מבחנים</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
+
+        {progress && progress.weakTopics.length > 0 && (
+          <section className="dash-chart-card glass-panel border border-[#29253f] rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-[#e5e2f5] flex items-center gap-2 mb-4">
+              <Sparkles className="text-[#34e4ea]" size={20} />
+              נושאים לחיזוק
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {progress.weakTopics.map(({ topic, count }) => (
+                <span
+                  key={topic}
+                  className="text-xs bg-[#221c3d] text-[#c9c5e0] border border-[#7c5cff]/30 px-3 py-1.5 rounded-full flex items-center gap-1.5"
+                >
+                  {topic}
+                  <span className="text-[#34e4ea] font-semibold">×{count}</span>
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#8d89ac] mt-3">
+              נושאים אלו הוזנו אוטומטית למורה הפרטי — הוא יתייחס אליהם ביוזמתו בפעם הבאה שתשוחח איתו.
+            </p>
+          </section>
+        )}
 
       </div>
     </div>

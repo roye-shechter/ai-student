@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { chatStream } from "@/lib/rag/chat"
 import { assertEmbeddingEnv, assertLlmEnv } from "@/lib/rag/clients"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
+import { recordActivity } from "@/lib/learning-session"
 
 /**
  * Chat endpoint — drives the enterprise RAG pipeline (lib/rag/chat.ts):
@@ -128,6 +129,12 @@ export async function POST(req: Request) {
         data: { userId, courseId: course.id },
       })
     }
+
+    // 5b. Track real study time for the dashboard's weekly-hours chart.
+    // Never let a tracking hiccup break the actual chat turn.
+    recordActivity(userId, course.id, "chat").catch((error) => {
+      console.error("[non-fatal] recordActivity failed:", error)
+    })
 
     // 6. Run the full RAG turn as a stream, forwarding each event to the
     // client as an NDJSON line. Once this ReadableStream starts, headers are

@@ -11,7 +11,7 @@ import { MarkdownMessage } from "@/components/markdown-message"
 import { SourceCitations, type SourceChunk } from "@/components/chat/source-citations"
 import { gsap, useGSAP } from "@/lib/gsap"
 import {
-  UploadCloud, FileText, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock, Square, RotateCcw, GraduationCap,
+  UploadCloud, FileText, FileAudio, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock, Square, RotateCcw, GraduationCap,
 } from "lucide-react"
 
 type CourseInfo = {
@@ -37,6 +37,11 @@ type ChatStreamEvent =
   | { type: "delta"; text: string }
   | { type: "done" }
   | { type: "error"; message: string }
+
+const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"]
+function isAudioFile(file: File): boolean {
+  return file.type.startsWith("audio/") || AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+}
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
   indexed: { label: "מאונדקס", className: "text-emerald-400" },
@@ -138,7 +143,11 @@ export default function CoursePage() {
 
   const handleUpload = async (file: File) => {
     setIsUploading(true)
-    setUploadStatus(`מעלה ומטמיע את "${file.name}"...`)
+    setUploadStatus(
+      isAudioFile(file)
+        ? `מתמלל ומטמיע את "${file.name}"... (הקלטות יכולות לקחת מעט יותר זמן)`
+        : `מעלה ומטמיע את "${file.name}"...`
+    )
     try {
       const formData = new FormData()
       formData.append("file", file)
@@ -322,7 +331,7 @@ export default function CoursePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.txt,application/pdf,text/plain"
+                accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
                 onChange={onFileSelected}
                 className="hidden"
                 disabled={isUploading}
@@ -339,10 +348,10 @@ export default function CoursePage() {
                   <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
                 )}
                 <span className="text-xs text-neutral-300 block">
-                  {isUploading ? "מעבד ומטמיע את המסמך..." : "עכשיו אתה יכול להעלות חומרים"}
+                  {isUploading ? "מעבד ומטמיע..." : "עכשיו אתה יכול להעלות חומרים"}
                 </span>
                 <span className="text-[10px] text-neutral-500 block mt-1">
-                  קובץ PDF / TXT — ייחתך, יוטמע (Embeddings) ויאוחסן ב-Pinecone
+                  PDF / TXT — ייחתך ויוטמע · הקלטת הרצאה (MP3/WAV/M4A/MP4) — תתומלל אוטומטית ותוטמע
                 </span>
               </button>
 
@@ -365,7 +374,11 @@ export default function CoursePage() {
                       key={doc.id}
                       className="flex items-center gap-2 p-2 bg-[#0a0a12] border border-[#29253f] rounded text-xs text-neutral-300"
                     >
-                      <FileText size={14} className="text-[#9b82ff] shrink-0" />
+                      {doc.fileType === "audio" ? (
+                        <FileAudio size={14} className="text-[#34e4ea] shrink-0" />
+                      ) : (
+                        <FileText size={14} className="text-[#9b82ff] shrink-0" />
+                      )}
                       <span className="truncate flex-1">{doc.title}</span>
                       <span className="text-[10px] text-neutral-500 shrink-0">{doc.chunkCount} קטעים</span>
                       <StatusBadge status={doc.status} />

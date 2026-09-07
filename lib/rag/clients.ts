@@ -20,6 +20,13 @@ export const EMBEDDING_MODEL = "text-embedding-3-small"
 export const EMBEDDING_DIMENSIONS = 1536
 
 /**
+ * OpenAI speech-to-text model for lecture recording ingestion (see
+ * lib/rag/transcribe.ts). Reuses the OpenAI client already wired in for
+ * embeddings — no new vendor needed.
+ */
+export const TRANSCRIPTION_MODEL = "gpt-4o-transcribe"
+
+/**
  * Anthropic chat model. claude-sonnet-4-6 is the current best speed/intelligence
  * balance and the documented replacement for the retired claude-3-5-sonnet — fast
  * enough for an interactive tutor while following the system prompt closely.
