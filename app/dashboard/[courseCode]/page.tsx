@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { upload } from "@vercel/blob/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,24 +142,45 @@ export default function CoursePage() {
     loadDocuments()
   }, [loadDocuments])
 
+  // While any document is still being processed in the background (see
+  // app/api/upload/finalize/route.ts's after()), keep refreshing the list so
+  // the existing StatusBadge moves from "ממתין"/"מעבד" to "מאונדקס"/"נכשל"
+  // on its own, without a manual reload.
+  useEffect(() => {
+    const hasPending = documents.some((d) => d.status === "pending" || d.status === "processing")
+    if (!hasPending) return
+    const interval = setInterval(loadDocuments, 3000)
+    return () => clearInterval(interval)
+  }, [documents, loadDocuments])
+
   const handleUpload = async (file: File) => {
     setIsUploading(true)
     setUploadStatus(
       isAudioFile(file)
-        ? `מתמלל ומטמיע את "${file.name}"... (הקלטות יכולות לקחת מעט יותר זמן)`
-        : `מעלה ומטמיע את "${file.name}"...`
+        ? `מעלה את ההקלטה "${file.name}"...`
+        : `מעלה את "${file.name}"...`
     )
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("courseCode", courseCode)
+      // The browser PUTs the file straight to Vercel Blob storage — it never
+      // passes through our own server, so there's no platform request-body
+      // size limit to worry about.
+      const blob = await upload(file.name, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload/token",
+      })
 
-      const response = await fetch("/api/upload", { method: "POST", body: formData })
+      setUploadStatus(`מטמיע את "${file.name}" ברקע...`)
+
+      const response = await fetch("/api/upload/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blobUrl: blob.url, fileName: file.name, courseCode }),
+      })
 
       // The server can fail before our JSON handler runs and return an HTML
       // error page. readJson() returns null for non-JSON, so we surface the
       // backend's error message (or a status-based one) instead of crashing.
-      const data = await readJson<{ error?: string; title?: string; chunkCount?: number }>(response)
+      const data = await readJson<{ error?: string; title?: string }>(response)
       if (!response.ok || !data) {
         throw new Error(
           data?.error || `השרת נתקל בשגיאה (קוד ${response.status}). נסה שוב מאוחר יותר.`
@@ -168,9 +190,9 @@ export default function CoursePage() {
       setUploadStatus(null)
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: `המסמך "${data.title}" נטען ונוסף לבסיס הידע (${data.chunkCount} קטעים). עכשיו אפשר לשאול עליו שאלות.` },
+        { role: "assistant", text: `המסמך "${data.title}" התקבל ומוטמע ברקע — הוא יופיע כזמין ברשימת החומרים תוך רגעים, ואז אפשר לשאול עליו.` },
       ])
-      await loadDocuments() // refresh the persistent list from the DB
+      await loadDocuments() // refresh the persistent list from the DB (shows "ממתין"/"מעבד" immediately)
     } catch (error) {
       setUploadStatus(error instanceof Error ? error.message : "אירעה שגיאה בהעלאת המסמך")
     } finally {
@@ -348,7 +370,7 @@ export default function CoursePage() {
                   <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
                 )}
                 <span className="text-xs text-neutral-300 block">
-                  {isUploading ? "מעבד ומטמיע..." : "עכשיו אתה יכול להעלות חומרים"}
+                  {isUploading ? uploadStatus ?? "מעלה..." : "עכשיו אתה יכול להעלות חומרים"}
                 </span>
                 <span className="text-[10px] text-neutral-500 block mt-1">
                   PDF / TXT — ייחתך ויוטמע · הקלטת הרצאה (MP3/WAV/M4A/MP4) — תתומלל אוטומטית ותוטמע

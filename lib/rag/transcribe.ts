@@ -10,7 +10,7 @@ import { getOpenAI, TRANSCRIPTION_MODEL } from "./clients"
  *
  * OpenAI's transcription endpoint hard-caps uploads at 25MB; callers must
  * enforce a stricter limit themselves (see MAX_AUDIO_BYTES in
- * app/api/upload/route.ts) since this function does not re-check size.
+ * app/api/upload/finalize/route.ts) since this function does not re-check size.
  */
 export async function transcribeAudio(file: File): Promise<string> {
   const openai = getOpenAI()

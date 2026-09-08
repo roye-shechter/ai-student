@@ -25,8 +25,18 @@ Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Pinecone (ו�
 
 ## ארכיטקטורה — דפוסים לשמור עליהם
 - **RAG pipeline** חי ב-`lib/rag/`: `clients.ts` (קליינטים משותפים + ולידציית env),
-  `ingest.ts` (חיתוך→embedding→Pinecone), `chat.ts` (retrieval→prompt→Claude,
-  כולל `chatStream()` — הגרסה הפעילה, streaming NDJSON).
+  `extract-text.ts` (זיהוי סוג קובץ + חילוץ טקסט מ-PDF), `ingest.ts` (חיתוך→embedding→
+  Pinecone), `chat.ts` (retrieval→prompt→Claude, כולל `chatStream()` — הגרסה הפעילה,
+  streaming NDJSON).
+- **העלאת מסמכים** (`app/api/upload/token` + `app/api/upload/finalize`): הקובץ עולה
+  ישירות מהדפדפן ל-Vercel Blob (עוקף את מגבלת ה-body של ~4.5MB שיש לפונקציות
+  serverless), ולא דרך גוף הבקשה שלנו. `finalize` יוצר `Document` בסטטוס
+  `pending` ומחזיר תשובה מיד; חיתוך/embedding/Pinecone רצים ברקע דרך
+  `after()` מ-`next/server` (לא חוסם את הלקוח, ולא כפוף למגבלת body). ה-UI
+  (`app/dashboard/[courseCode]/page.tsx`) עושה polling על `/api/documents` כל
+  שיש `status` של `pending`/`processing`, ומציג אותו דרך `StatusBadge` הקיים.
+  **אל תחזירו** להעלאה סינכרונית עם קובץ בגוף הבקשה — זה בדיוק הבאג שתוקן
+  (קבצים מעל ~4.5MB נכשלו בשקט ברמת הפלטפורמה, לפני שהקוד שלנו בכלל רץ).
 - **Routes דקים**: כל `app/api/**/route.ts` עושה auth → rate-limit → delegate ל-`lib/`,
   לא לוגיקה עסקית ב-route עצמו.
 - **בידוד דיירים (tenant isolation)**: כל שאילתת Pinecone מסוננת לפי `{userId, courseId}` —
