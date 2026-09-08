@@ -4,6 +4,9 @@ import { randomUUID } from "crypto"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { dateOnlyToUTC } from "@/lib/exam-dates"
+
+const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date")
 
 // crypto.randomUUID needs the Node.js runtime (not edge).
 export const runtime = "nodejs"
@@ -34,6 +37,16 @@ export async function GET() {
 const createCourseSchema = z.object({
   courseName: z.string().trim().min(1, "Course name is required").max(120),
   credits: z.coerce.number().min(0, "Credits cannot be negative").max(100).default(0),
+  // All optional — the creation wizard lets a student skip exam dates
+  // entirely and add them later from the course page.
+  examDates: z
+    .object({
+      midterm: dateOnlySchema.optional(),
+      finalA: dateOnlySchema.optional(),
+      finalB: dateOnlySchema.optional(),
+    })
+    .partial()
+    .optional(),
 })
 
 /**
@@ -75,7 +88,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const { courseName, credits } = parsed
+    const { courseName, credits, examDates } = parsed
 
     // Sequential writes instead of an interactive ($transaction) transaction.
     // On a Neon serverless cold start the DB can take several seconds to wake
@@ -110,6 +123,27 @@ export async function POST(req: Request) {
       // Roll back the orphaned course (best effort — don't mask the real error).
       await prisma.course.delete({ where: { id: course.id } }).catch(() => {})
       throw enrollError
+    }
+
+    // Best-effort — a failure here shouldn't undo the course/enrollment that
+    // already succeeded; the student can still set dates later from the
+    // course page's exam-dates card.
+    const examDateRows: { type: string; date: string }[] = []
+    if (examDates?.midterm) examDateRows.push({ type: "midterm", date: examDates.midterm })
+    if (examDates?.finalA) examDateRows.push({ type: "final_a", date: examDates.finalA })
+    if (examDates?.finalB) examDateRows.push({ type: "final_b", date: examDates.finalB })
+    if (examDateRows.length > 0) {
+      try {
+        await prisma.examDate.createMany({
+          data: examDateRows.map((row) => ({
+            courseId: course.id,
+            type: row.type,
+            date: dateOnlyToUTC(row.date),
+          })),
+        })
+      } catch (examDateError) {
+        console.error("[CRITICAL_ERROR] ExamDate creation after course creation failed:", examDateError)
+      }
     }
 
     return NextResponse.json({ course }, { status: 201 })

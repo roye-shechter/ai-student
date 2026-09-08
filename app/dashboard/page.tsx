@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2, Sparkles, Plus } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import { CreateCourseDialog } from "@/components/create-course-dialog"
 import { CourseIllustration } from "@/components/course-illustration"
+import { DashboardExamCalendar } from "@/components/dashboard-exam-calendar"
 import { readJson } from "@/lib/http"
 import { gsap, useGSAP } from "@/lib/gsap"
 
@@ -132,6 +133,8 @@ export default function Dashboard() {
             הגדרות פרופיל
           </Button>
         </header>
+
+        {!loading && <DashboardExamCalendar />}
 
         {/* הספרייה שלי — גלריית הקורסים */}
         <section>

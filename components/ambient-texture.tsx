@@ -101,8 +101,8 @@ export function AmbientTexture() {
             x2={NODES[b].left}
             y2={NODES[b].top}
             stroke="#ffb066"
-            strokeWidth="0.12"
-            strokeOpacity="0.22"
+            strokeWidth="1.4"
+            strokeOpacity="0.4"
             vectorEffect="non-scaling-stroke"
           />
         ))}

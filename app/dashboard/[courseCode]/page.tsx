@@ -12,6 +12,7 @@ import { MarkdownMessage } from "@/components/markdown-message"
 import { SourceCitations, type SourceChunk } from "@/components/chat/source-citations"
 import { NameDocumentDialog } from "@/components/name-document-dialog"
 import { ManageMaterialsDialog } from "@/components/manage-materials-dialog"
+import { ExamDatesCard, type ExamDateEntry } from "@/components/exam-dates-card"
 import { TutorAvatar } from "@/components/tutor-avatar"
 import { gsap, useGSAP } from "@/lib/gsap"
 import {
@@ -73,6 +74,7 @@ export default function CoursePage() {
   const [documents, setDocuments] = useState<CourseDocument[]>([])
   const [docsLoading, setDocsLoading] = useState(true)
   const [docsError, setDocsError] = useState<string | null>(null)
+  const [examDates, setExamDates] = useState<ExamDateEntry[]>([])
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", text: "שלום! אני המורה הפרטי שלך לקורס זה. העלה חומרי לימוד, ואשמח ללמד אותך, להסביר ולענות על כל שאלה — מבוסס מדויק על החומר שהעלית." },
@@ -127,6 +129,21 @@ export default function CoursePage() {
   useEffect(() => {
     loadDocuments()
   }, [loadDocuments])
+
+  const loadExamDates = useCallback(async () => {
+    if (!course?.id) return
+    try {
+      const res = await fetch(`/api/courses/${course.id}/exam-dates`)
+      const data = await readJson<{ examDates?: ExamDateEntry[] }>(res)
+      if (res.ok && data) setExamDates(data.examDates ?? [])
+    } catch {
+      // Non-critical — the card just shows every slot as unset.
+    }
+  }, [course?.id])
+
+  useEffect(() => {
+    loadExamDates()
+  }, [loadExamDates])
 
   // While any document is still being processed in the background (see
   // app/api/upload/finalize/route.ts's after()), keep refreshing the list so
@@ -343,6 +360,10 @@ export default function CoursePage() {
             <h1 className="font-serif gold-text text-3xl">{courseTitle}</h1>
             {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
           </div>
+
+          {course?.id && (
+            <ExamDatesCard courseId={course.id} examDates={examDates} onChanged={loadExamDates} />
+          )}
 
           {/* Three matching entry points — one clean job each, same visual
               weight, instead of the old dropzone-plus-list mix. */}

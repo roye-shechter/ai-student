@@ -118,11 +118,33 @@ model Course {
   learningSessions LearningSession[]
   documents        Document[]
   chatSessions     ChatSession[]
+  examDates        ExamDate[]
 
   @@index([courseCode])
   @@index([moodleCourseId])
   @@index([creatorId])
   @@map("courses")
+}
+
+// A single exam date for a course: at most one "midterm" and one each of
+// "final_a"/"final_b" (מועד א / מועד ב) per course, enforced by the unique
+// constraint below. Course-level (not per-user) since these are objective
+// facts about the course, shared by every enrolled student — set once at
+// course creation (CreateCourseDialog) and editable later from the course
+// page (ExamDatesCard).
+model ExamDate {
+  id        String   @id @default(cuid())
+  courseId  String
+  type      String // "midterm" | "final_a" | "final_b"
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, type])
+  @@index([courseId])
+  @@map("exam_dates")
 }
 
 model Enrollment {

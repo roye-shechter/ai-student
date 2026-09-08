@@ -58,6 +58,19 @@ Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Vercel Blob (
 - Rate limiting: `lib/rate-limit.ts` — `assertUnderDailyLimit(userId, kind)`,
   מכסה יומית per-user לפי `UsageCounter` ב-DB.
 
+## מועדי בחינות
+`ExamDate` (`prisma/schema.prisma`) מחזיק עד שלוש שורות לכל קורס — `midterm`
+(בוחן אמצע, אופציונלי), `final_a` ו-`final_b` (מועד א/ב) — עם `@@unique([courseId,
+type])`. אלה עובדות **ברמת הקורס, לא לפי משתמש** (כמו הקורסים עצמם — קטלוג
+משותף), so כל סטודנט רשום רואה ועורך אותם. `CreateCourseDialog` שואל עליהם
+כאשגר יוצרים קורס (עם אפשרות "דלג, אמלא אחר כך"); `ExamDatesCard` בדף הקורס
+מאפשר לערוך/למחוק כל שדה בנפרד (`PUT`/`DELETE` implicit דרך `date: null` ב-
+`/api/courses/[courseId]/exam-dates`); `DashboardExamCalendar` בדשבורד הראשי
+מרכז את כל התאריכים מכל הקורסים של המשתמש (`/api/exam-dates`, דרך
+`Enrollment`). כל התאריכים נשמרים כ"YYYY-MM-DD" ומומרים ל-UTC midnight
+(`lib/exam-dates.ts`'s `dateOnlyToUTC`/`formatDateOnly*`) — לעולם לא Date עם
+שעה אמיתית, כדי שהתאריך שנבחר לא יזוז יום בגלל timezone.
+
 ## משתני סביבה נדרשים
 ראה `.env.example` — `DATABASE_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`,
 `OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`. (אין יותר מפתח וקטור-DB נפרד —
