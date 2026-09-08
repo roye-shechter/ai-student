@@ -186,10 +186,16 @@
     animation: thread-travel 7s linear infinite;
   }
 
-  /* Ambient background's neuron nodes — a slow glow breathing, offset per
-     node (see ambient-texture.tsx's animationDelay) so the mesh reads as
-     asynchronous neural activity rather than one synchronized blink. */
+  /* Ambient background's neuron nodes (SVG <circle>s) — a slow glow
+     breathing, offset per node (see ambient-texture.tsx's animationDelay)
+     so the mesh reads as asynchronous neural activity rather than one
+     synchronized blink. transform-box/-origin: scale from each circle's
+     own center, not the SVG canvas's (0,0) — the CSS default for SVG
+     shapes, which would otherwise make every node drift toward the
+     bottom-right as it "pulses" instead of growing in place. */
   .ambient-node {
+    transform-box: fill-box;
+    transform-origin: center;
     animation: node-pulse 4s ease-in-out infinite;
   }
 
