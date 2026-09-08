@@ -28,7 +28,11 @@ function test(name, fn) {
     })
 }
 
-const ENV_KEYS = ["OPENAI_API_KEY", "PINECONE_API_KEY", "PINECONE_INDEX", "ANTHROPIC_API_KEY"]
+// DATABASE_URL isn't checked here — Prisma requires it just to import
+// lib/prisma.ts (which lib/rag/clients.ts doesn't touch), so it's already a
+// hard prerequisite for the app to run at all, not something
+// assertEmbeddingEnv/assertLlmEnv need to re-verify.
+const ENV_KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
 const clearKeys = () => ENV_KEYS.forEach((k) => delete process.env[k])
 const setAll = () => ENV_KEYS.forEach((k) => (process.env[k] = "test-value"))
 
@@ -45,10 +49,10 @@ await test("requireEnv returns the value when present", () => {
   process.env.OPENAI_API_KEY = "sk-abc"
   assert.equal(requireEnv("OPENAI_API_KEY"), "sk-abc")
 })
-await test("assertEmbeddingEnv flags PINECONE_API_KEY when only it is missing", () => {
+await test("assertEmbeddingEnv flags OPENAI_API_KEY when missing (no vector-DB key needed anymore — pgvector lives in Postgres)", () => {
   setAll()
-  delete process.env.PINECONE_API_KEY
-  assert.throws(() => assertEmbeddingEnv(), /PINECONE_API_KEY/)
+  delete process.env.OPENAI_API_KEY
+  assert.throws(() => assertEmbeddingEnv(), /OPENAI_API_KEY/)
 })
 await test("assertLlmEnv flags ANTHROPIC_API_KEY when missing", () => {
   setAll()

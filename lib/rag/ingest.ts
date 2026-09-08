@@ -1,19 +1,15 @@
+import { randomUUID } from "node:crypto"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import {
-  assertEmbeddingEnv,
-  EMBEDDING_MODEL,
-  getIndex,
-  getOpenAI,
-  namespaceForCourse,
-  type ChunkMetadata,
-} from "./clients"
+import { assertEmbeddingEnv, EMBEDDING_MODEL, getOpenAI, toVectorSql } from "./clients"
 
 /**
  * Ingestion pipeline.
  *
- * Raw text -> recursive chunks -> OpenAI embeddings -> Pinecone upsert.
- * Every upserted vector carries { userId, courseId } metadata (plus documentId
- * and chunkIndex) so retrieval can rigidly filter by tenant.
+ * Raw text -> recursive chunks -> OpenAI embeddings -> pgvector insert
+ * (DocumentChunk, see prisma/schema.prisma). Every row carries userId +
+ * courseId directly so retrieval can rigidly filter by tenant with a plain
+ * SQL WHERE clause (see retrieveContext() in chat.ts).
  */
 
 export type ChunkOptions = {
@@ -26,7 +22,7 @@ const DEFAULT_SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 const DEFAULT_CHUNK_SIZE = 1000
 const DEFAULT_CHUNK_OVERLAP = 200
 const EMBED_BATCH = 96 // OpenAI accepts arrays; keep batches modest
-const UPSERT_BATCH = 100 // Pinecone recommended max records per upsert
+const INSERT_BATCH = 100 // rows per multi-row INSERT
 
 /**
  * Recursively split text on a descending list of separators (paragraph ->
@@ -138,9 +134,9 @@ export type IngestParams = {
   userId: string
   courseId: string
   documentId: string
-  /** Original upload filename, stored on every chunk's metadata. */
+  /** Original upload filename, stored on every chunk. */
   fileName: string
-  /** Upload time as epoch milliseconds, stored on every chunk's metadata. */
+  /** Upload time as epoch milliseconds, stored on every chunk. */
   uploadTimestamp: number
   text: string
   chunkOptions?: ChunkOptions
@@ -149,20 +145,53 @@ export type IngestParams = {
 export type IngestResult = {
   documentId: string
   chunkCount: number
-  namespace: string
 }
 
 /**
- * Chunk, embed, and upsert a document's text into Pinecone, then mark the
- * Document row as indexed in Postgres. The Document row is expected to already
+ * Insert one batch of already-embedded chunks as a single multi-row INSERT.
+ * ON CONFLICT lets re-ingestion of the same document overwrite its rows
+ * cleanly instead of erroring or duplicating.
+ */
+async function insertChunkBatch(args: {
+  documentId: string
+  userId: string
+  courseId: string
+  fileName: string
+  uploadedAt: Date
+  chunks: { chunkIndex: number; text: string; embedding: number[] }[]
+}): Promise<void> {
+  const { documentId, userId, courseId, fileName, uploadedAt, chunks } = args
+  if (chunks.length === 0) return
+
+  const rows = chunks.map(
+    (c) => Prisma.sql`(
+      ${randomUUID()}, ${documentId}, ${userId}, ${courseId}, ${c.chunkIndex},
+      ${c.text}, ${fileName}, ${uploadedAt}, ${toVectorSql(c.embedding)}::vector
+    )`
+  )
+
+  await prisma.$executeRaw`
+    INSERT INTO document_chunks
+      (id, "documentId", "userId", "courseId", "chunkIndex", text, "fileName", "uploadedAt", embedding)
+    VALUES ${Prisma.join(rows)}
+    ON CONFLICT ("documentId", "chunkIndex") DO UPDATE SET
+      text = EXCLUDED.text,
+      embedding = EXCLUDED.embedding,
+      "fileName" = EXCLUDED."fileName",
+      "uploadedAt" = EXCLUDED."uploadedAt"
+  `
+}
+
+/**
+ * Chunk, embed, and insert a document's text into Postgres (pgvector), then
+ * mark the Document row as indexed. The Document row is expected to already
  * exist (created when the file is uploaded).
  */
 export async function ingestDocument(params: IngestParams): Promise<IngestResult> {
-  // Fail fast with a precise message if any embedding/vector key is missing.
   assertEmbeddingEnv()
 
   const { userId, courseId, documentId, fileName, uploadTimestamp, text, chunkOptions } = params
-  const namespace = namespaceForCourse(courseId)
+  const uploadedAt = new Date(uploadTimestamp)
 
   await prisma.document.update({
     where: { id: documentId },
@@ -173,31 +202,21 @@ export async function ingestDocument(params: IngestParams): Promise<IngestResult
     const chunks = chunkText(text, chunkOptions)
     const embeddings = await embedTexts(chunks)
 
-    const records = chunks.map((chunk, i) => ({
-      id: `${documentId}:${i}`,
-      values: embeddings[i],
-      metadata: {
-        userId,
-        courseId,
-        documentId,
-        chunkIndex: i,
-        text: chunk,
-        fileName,
-        uploadTimestamp,
-      } satisfies ChunkMetadata,
-    }))
-
-    const index = getIndex().namespace(namespace)
-    for (let i = 0; i < records.length; i += UPSERT_BATCH) {
-      await index.upsert({ records: records.slice(i, i + UPSERT_BATCH) })
+    for (let i = 0; i < chunks.length; i += INSERT_BATCH) {
+      const batch = chunks.slice(i, i + INSERT_BATCH).map((chunkText, j) => ({
+        chunkIndex: i + j,
+        text: chunkText,
+        embedding: embeddings[i + j],
+      }))
+      await insertChunkBatch({ documentId, userId, courseId, fileName, uploadedAt, chunks: batch })
     }
 
     await prisma.document.update({
       where: { id: documentId },
-      data: { status: "indexed", chunkCount: chunks.length, pineconeNamespace: namespace },
+      data: { status: "indexed", chunkCount: chunks.length },
     })
 
-    return { documentId, chunkCount: chunks.length, namespace }
+    return { documentId, chunkCount: chunks.length }
   } catch (error) {
     await prisma.document.update({
       where: { id: documentId },

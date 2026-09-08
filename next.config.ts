@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   // the server bundle so it is resolved via native require and those data files
   // remain available inside the serverless function.
   serverExternalPackages: ["pdf2json"],
+  // The floating dev-mode indicator badge is local-dev-only noise (never
+  // rendered in a production build) — off so it doesn't sit on top of the UI
+  // while testing.
+  devIndicators: false,
 };
 
 export default nextConfig;

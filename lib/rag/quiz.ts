@@ -4,7 +4,7 @@ import { assertEmbeddingEnv, assertLlmEnv, CHAT_MODEL, getAnthropic, HARD_CHAT_M
 import { classifyComplexity, retrieveContext, type RetrievedChunk } from "./chat"
 
 /**
- * Quiz generation + grading, built on top of the same retrieval (Pinecone,
+ * Quiz generation + grading, built on top of the same retrieval (pgvector,
  * tenant-scoped) and Claude client already used by the chat pipeline. Two
  * structured-output calls:
  *   - generateQuiz(): builds N questions grounded in the course material.

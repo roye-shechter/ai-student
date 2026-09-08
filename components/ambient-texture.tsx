@@ -3,10 +3,34 @@
  * with one warm amber glow — the same move dark AI-product hero sections
  * lean on (a soft radial light source standing in for a photograph, not a
  * flat color block) — sitting behind every page instead of only a marketing
- * hero. No motion: the glow is positioned, not animated, so it never
- * competes with foreground content. Server component: static, so it costs
- * nothing at runtime.
+ * hero. The glow itself is positioned, not animated; a thin animated
+ * "neural thread" layer (see NODES/THREADS below) is the one deliberate
+ * motion cue, kept low-opacity so it never competes with foreground
+ * content. Server component: the animation is pure CSS, so this still
+ * costs nothing at runtime.
  */
+
+// Fixed node positions (percent of viewport), reused for both the dot
+// markers and the SVG thread endpoints below — not randomized, so the
+// page never shifts between loads.
+const NODES = [
+  { top: 8, left: 12, size: 3 },
+  { top: 14, left: 82, size: 2 },
+  { top: 26, left: 68, size: 2 },
+  { top: 5, left: 40, size: 2 },
+  { top: 22, left: 22, size: 3 },
+] as const
+
+// Index pairs into NODES — deliberately not fully connected (a sparse
+// graph reads as a network; a complete one just reads as clutter).
+const THREADS: [number, number][] = [
+  [0, 3],
+  [3, 1],
+  [3, 2],
+  [0, 4],
+  [4, 2],
+]
+
 export function AmbientTexture() {
   return (
     <div aria-hidden="true" className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none">
@@ -50,19 +74,39 @@ export function AmbientTexture() {
 
       {/* A few scattered nodes, like distant instrument-panel indicators —
           fixed positions, not randomized, so the page never shifts. */}
-      {[
-        { top: "8%", left: "12%", size: 3 },
-        { top: "14%", left: "82%", size: 2 },
-        { top: "26%", left: "68%", size: 2 },
-        { top: "5%", left: "40%", size: 2 },
-        { top: "22%", left: "22%", size: 3 },
-      ].map((d, i) => (
+      {NODES.map((d, i) => (
         <div
           key={i}
           className="absolute rounded-full bg-[#ffb066]"
-          style={{ top: d.top, left: d.left, width: d.size, height: d.size, opacity: 0.35 }}
+          style={{ top: `${d.top}%`, left: `${d.left}%`, width: d.size, height: d.size, opacity: 0.35 }}
         />
       ))}
+
+      {/* Thin lines wiring the nodes together, with a slow traveling-dash
+          pulse — the same node field, now read as a synapse/network
+          diagram instead of just floating instrument dots: a quiet nod to
+          "this is a learning brain," not a literal illustration of one. */}
+      <svg
+        className="absolute inset-0 w-full h-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        {THREADS.map(([a, b], i) => (
+          <line
+            key={i}
+            className="ambient-thread"
+            x1={NODES[a].left}
+            y1={NODES[a].top}
+            x2={NODES[b].left}
+            y2={NODES[b].top}
+            stroke="#ffb066"
+            strokeWidth="0.12"
+            strokeOpacity="0.22"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
 
       <div
         className="absolute inset-0 opacity-[0.04] mix-blend-overlay"

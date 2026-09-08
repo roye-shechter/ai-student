@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { ArrowLeft, Loader2, Sparkles, Plus, TrendingUp, Target } from "lucide-react"
+import { ArrowLeft, Loader2, Sparkles, Plus } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import { CreateCourseDialog } from "@/components/create-course-dialog"
 import { CourseIllustration } from "@/components/course-illustration"
@@ -18,13 +17,6 @@ type Me = { onboardingCompleted: boolean; institution: string | null }
 type Enrollment = {
   completionPercentage: number
   course: { id: string; courseCode: string; courseName: string; description: string | null; credits: number }
-}
-
-type ProgressSummary = {
-  weeklyHours: { name: string; hours: number }[]
-  averageScore: number | null
-  attemptCount: number
-  weakTopics: { topic: string; count: number }[]
 }
 
 // A gallery grid needs visual variety the way a photographer's portfolio
@@ -44,7 +36,6 @@ export default function Dashboard() {
 
   const [me, setMe] = useState<Me | null>(null)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
-  const [progress, setProgress] = useState<ProgressSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateCourse, setShowCreateCourse] = useState(false)
 
@@ -52,17 +43,11 @@ export default function Dashboard() {
 
   const loadData = useCallback(async () => {
     try {
-      const [meRes, enrRes, progRes] = await Promise.all([
-        fetch("/api/me"),
-        fetch("/api/enrollments"),
-        fetch("/api/progress/summary"),
-      ])
+      const [meRes, enrRes] = await Promise.all([fetch("/api/me"), fetch("/api/enrollments")])
       const meData = await readJson<Me>(meRes)
       if (meRes.ok && meData) setMe(meData)
       const enrData = await readJson<{ enrollments?: Enrollment[] }>(enrRes)
       if (enrRes.ok && enrData) setEnrollments(enrData.enrollments ?? [])
-      const progData = await readJson<ProgressSummary>(progRes)
-      if (progRes.ok && progData) setProgress(progData)
     } finally {
       setLoading(false)
     }
@@ -73,9 +58,9 @@ export default function Dashboard() {
   }, [loadData])
 
   // One quiet entrance once real data has arrived — header settles, the
-  // library grid follows in reading order, then the analytics row. Each
-  // course's progress bar/percentage counts up to its real value since
-  // that number is the one worth a moment of attention.
+  // library grid follows in reading order. Each course's progress
+  // bar/percentage counts up to its real value since that number is the
+  // one worth a moment of attention.
   useGSAP(
     () => {
       if (loading) return
@@ -87,7 +72,6 @@ export default function Dashboard() {
           { opacity: 1, y: 0, duration: 0.6, stagger: 0.09 },
           "-=0.3"
         )
-        .fromTo(".dash-chart-card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6, stagger: 0.1 }, "-=0.35")
 
       document.querySelectorAll<HTMLElement>(".dash-progress-fill").forEach((el) => {
         const target = Number(el.dataset.value ?? 0)
@@ -124,15 +108,6 @@ export default function Dashboard() {
   }
 
   const showOnboarding = !loading && me !== null && !me.onboardingCompleted
-
-  const totalHours = progress?.weeklyHours.reduce((sum, w) => sum + w.hours, 0) ?? 0
-  const hasHoursData = totalHours > 0
-  const hasScoreData = (progress?.attemptCount ?? 0) > 0
-  const avgScore = Math.round(progress?.averageScore ?? 0)
-  const scorePieData = [
-    { name: "רמת הבנה", value: avgScore, color: "#ff7a3d" },
-    { name: "נותר לחזק", value: 100 - avgScore, color: "#242b3a" },
-  ]
 
   return (
     <div ref={rootRef} className="relative z-10 min-h-screen text-[#f5f6f8] p-8" dir="rtl">
@@ -246,93 +221,6 @@ export default function Dashboard() {
             </div>
           )}
         </section>
-
-        {/* אזור האנליטיקה */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-[#242b3a]">
-          <Card className="dash-chart-card bg-[#12161f] border-[#242b3a] rounded-sm text-white">
-            <CardHeader>
-              <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
-                <TrendingUp size={16} />
-                שעות למידה שבועיות
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-64">
-              {!loading && !hasHoursData ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-[#8b93a3] text-sm gap-2">
-                  <TrendingUp size={22} className="text-[#ff7a3d]/50" />
-                  עדיין אין נתוני זמן למידה. שיחה או מבחן תרגול ראשונים יופיעו כאן.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={progress?.weeklyHours ?? []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#242b3a" />
-                    <XAxis dataKey="name" stroke="#8b93a3" />
-                    <YAxis stroke="#8b93a3" />
-                    <Tooltip contentStyle={{ backgroundColor: '#12161f', borderColor: '#ff7a3d', color: '#fff' }} cursor={{ fill: '#ffffff08' }} />
-                    <Bar dataKey="hours" fill="#ff7a3d" radius={[2, 2, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="dash-chart-card bg-[#12161f] border-[#242b3a] rounded-sm text-white">
-            <CardHeader>
-              <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
-                <Target size={16} />
-                רמת הבנה ממוצעת (לפי מבחני תרגול)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-64 flex items-center justify-center">
-              {!loading && !hasScoreData ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-[#8b93a3] text-sm gap-2 px-4">
-                  <Target size={22} className="text-[#ff7a3d]/50" />
-                  עדיין לא ביצעת מבחן תרגול. נסה אחד בעמוד של קורס כדי לראות כאן את רמת ההבנה שלך.
-                </div>
-              ) : (
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={scorePieData} innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value">
-                        {scorePieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#12161f', borderColor: '#ff7a3d', color: '#fff' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="font-serif text-2xl text-white">{avgScore}%</span>
-                    <span className="text-[10px] text-[#8b93a3]">{progress?.attemptCount} מבחנים</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-
-        {progress && progress.weakTopics.length > 0 && (
-          <section className="dash-chart-card border border-[#242b3a] rounded-sm p-6">
-            <h2 className="text-sm font-medium text-[#ffb066] flex items-center gap-2 mb-4">
-              <Sparkles size={16} />
-              נושאים לחיזוק
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {progress.weakTopics.map(({ topic, count }) => (
-                <span
-                  key={topic}
-                  className="text-xs bg-[#161b26] text-[#c9c9d1] border border-[#242b3a] px-3 py-1.5 rounded-sm flex items-center gap-1.5"
-                >
-                  {topic}
-                  <span className="text-[#ffb066] font-semibold">×{count}</span>
-                </span>
-              ))}
-            </div>
-            <p className="text-[11px] text-[#8b93a3] mt-3">
-              נושאים אלו הוזנו אוטומטית למורה הפרטי — הוא יתייחס אליהם ביוזמתו בפעם הבאה שתשוחח איתו.
-            </p>
-          </section>
-        )}
 
       </div>
     </div>

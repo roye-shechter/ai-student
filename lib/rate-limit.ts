@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
  * Coarse per-user daily quotas on the LLM/embedding-backed endpoints
  * (/api/chat, /api/upload). Without this, one user's script loop (or a
  * malicious actor) has unbounded spend exposure against the owner's
- * OpenAI/Anthropic/Pinecone API keys — see UsageCounter in schema.prisma.
+ * OpenAI/Anthropic API keys — see UsageCounter in schema.prisma.
  *
  * This is intentionally coarse (daily granularity via a single upsert+increment,
  * not a sliding window) — sufficient to bound worst-case cost for a solo dev

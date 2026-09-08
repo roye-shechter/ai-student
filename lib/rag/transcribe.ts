@@ -4,7 +4,7 @@ import { getOpenAI, TRANSCRIPTION_MODEL } from "./clients"
  * Lecture recording ingestion. Transcribes an audio file via OpenAI's
  * speech-to-text (the same client already used for embeddings — no new
  * vendor), then hands the transcript to the existing ingestDocument()
- * pipeline (lib/rag/ingest.ts) unchanged: chunk → embed → Pinecone, exactly
+ * pipeline (lib/rag/ingest.ts) unchanged: chunk → embed → pgvector, exactly
  * like a PDF/TXT upload. This is the entire integration surface — the RAG
  * pipeline downstream has no idea the text originated from audio.
  *

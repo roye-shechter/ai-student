@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
 import { MarkdownMessage } from "@/components/markdown-message"
 import { SourceCitations, type SourceChunk } from "@/components/chat/source-citations"
+import { NameDocumentDialog } from "@/components/name-document-dialog"
+import { ManageMaterialsDialog } from "@/components/manage-materials-dialog"
+import { TutorAvatar } from "@/components/tutor-avatar"
 import { gsap, useGSAP } from "@/lib/gsap"
 import {
-  UploadCloud, FileText, FileAudio, ArrowRight, Send, Bot, User, Loader2, CheckCircle2, AlertCircle, Clock, Square, RotateCcw, GraduationCap,
+  FolderOpen, ArrowRight, ArrowLeft, Send, User, AlertCircle, Square, RotateCcw, GraduationCap, TrendingUp,
 } from "lucide-react"
 
 type CourseInfo = {
@@ -44,32 +47,13 @@ function isAudioFile(file: File): boolean {
   return file.type.startsWith("audio/") || AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
 }
 
-const STATUS_META: Record<string, { label: string; className: string }> = {
-  indexed: { label: "מאונדקס", className: "text-emerald-400" },
-  processing: { label: "מעבד", className: "text-[#ffb066]" },
-  pending: { label: "ממתין", className: "text-neutral-400" },
-  failed: { label: "נכשל", className: "text-red-400" },
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? { label: status, className: "text-neutral-400" }
-  const Icon =
-    status === "indexed" ? CheckCircle2 : status === "failed" ? AlertCircle : status === "processing" ? Loader2 : Clock
-  return (
-    <span className={`flex items-center gap-1 text-[10px] shrink-0 ${meta.className}`}>
-      <Icon size={12} className={status === "processing" ? "animate-spin" : ""} />
-      {meta.label}
-    </span>
-  )
-}
-
 /** The tutor's "thinking" state — a three-dot wave rather than a bare
  * spinner, so waiting for the AI reads as a distinct, branded moment. */
 function ThinkingIndicator() {
   return (
     <div className="flex gap-3 ml-auto items-center text-neutral-400 text-sm">
       <div className="p-2 rounded-lg flex h-8 w-8 items-center justify-center shrink-0 bg-[#161b26] text-[#ffb066]">
-        <Bot size={16} />
+        <TutorAvatar size={16} />
       </div>
       <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl rounded-tr-none bg-[#161b26]">
         <span className="typing-dot h-1.5 w-1.5 rounded-full bg-[#ff7a3d]" style={{ animationDelay: "0ms" }} />
@@ -103,6 +87,8 @@ export default function CoursePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [showManageDialog, setShowManageDialog] = useState(false)
 
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -153,12 +139,12 @@ export default function CoursePage() {
     return () => clearInterval(interval)
   }, [documents, loadDocuments])
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, title: string) => {
     setIsUploading(true)
     setUploadStatus(
       isAudioFile(file)
-        ? `מעלה את ההקלטה "${file.name}"...`
-        : `מעלה את "${file.name}"...`
+        ? `מעלה את ההקלטה "${title}"...`
+        : `מעלה את "${title}"...`
     )
     try {
       // The browser PUTs the file straight to Vercel Blob storage — it never
@@ -169,12 +155,12 @@ export default function CoursePage() {
         handleUploadUrl: "/api/upload/token",
       })
 
-      setUploadStatus(`מטמיע את "${file.name}" ברקע...`)
+      setUploadStatus(`מטמיע את "${title}" ברקע...`)
 
       const response = await fetch("/api/upload/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blobUrl: blob.url, fileName: file.name, courseCode }),
+        body: JSON.stringify({ blobUrl: blob.url, fileName: file.name, title, courseCode }),
       })
 
       // The server can fail before our JSON handler runs and return an HTML
@@ -188,10 +174,6 @@ export default function CoursePage() {
       }
 
       setUploadStatus(null)
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: `המסמך "${data.title}" התקבל ומוטמע ברקע — הוא יופיע כזמין ברשימת החומרים תוך רגעים, ואז אפשר לשאול עליו.` },
-      ])
       await loadDocuments() // refresh the persistent list from the DB (shows "ממתין"/"מעבד" immediately)
     } catch (error) {
       setUploadStatus(error instanceof Error ? error.message : "אירעה שגיאה בהעלאת המסמך")
@@ -201,9 +183,23 @@ export default function CoursePage() {
     }
   }
 
+  // Picking a file doesn't upload it immediately — it opens NameDocumentDialog
+  // first (required naming step). Only handleNameConfirm actually starts the
+  // upload, once a name is given.
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) handleUpload(file)
+    if (file) setPendingFile(file)
+  }
+
+  const handleNameConfirm = (title: string) => {
+    const file = pendingFile
+    setPendingFile(null)
+    if (file) handleUpload(file, title)
+  }
+
+  const handleNameCancel = () => {
+    setPendingFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const sendMessage = useCallback(
@@ -331,92 +327,78 @@ export default function CoursePage() {
 
         {/* חלק ימין: חומרי לימוד */}
         <div className="space-y-6 flex flex-col">
-          <div className="course-info-card glass-panel border border-[#242b3a] rounded-sm p-6 space-y-3">
+          {/* The hidden file input has to live somewhere in the DOM — it's
+              triggered from inside ManageMaterialsDialog now (onRequestUpload),
+              not from a dropzone on the page itself. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
+            onChange={onFileSelected}
+            className="hidden"
+            disabled={isUploading}
+          />
+
+          <div className="course-info-card glass-panel border border-[#242b3a] rounded-sm p-6 space-y-1">
             <h1 className="font-serif gold-text text-3xl">{courseTitle}</h1>
             {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
-            <Link href={`/dashboard/${courseCode}/quiz`} className="block">
-              <Button className="w-full bg-[#2a2015] hover:bg-[#342a17] text-[#ffb066] border border-[#ff7a3d]/40 rounded-sm flex items-center gap-2 transition-all duration-300">
-                <GraduationCap size={16} />
-                התחל מבחן תרגול
-              </Button>
-            </Link>
           </div>
 
-          <Card className="course-docs-card glass-panel border-[#242b3a] text-white flex-1 flex flex-col">
-            <CardHeader>
-              <CardTitle className="text-lg text-[#ffb066] flex items-center gap-2">
-                <UploadCloud size={20} />
-                חומרי קורס זה
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 flex-1 overflow-y-auto">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
-                onChange={onFileSelected}
-                className="hidden"
-                disabled={isUploading}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full border-2 border-dashed border-[#242b3a] rounded-sm p-6 text-center bg-[#0a0e14]/40 transition-all duration-300 hover:border-[#ff7a3d]/60 hover:bg-[#0a0e14]/70 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isUploading ? (
-                  <Loader2 size={28} className="mx-auto text-[#ff7a3d] mb-2 animate-spin" />
-                ) : (
-                  <UploadCloud size={28} className="mx-auto text-neutral-500 mb-2" />
-                )}
-                <span className="text-xs text-neutral-300 block">
-                  {isUploading ? uploadStatus ?? "מעלה..." : "עכשיו אתה יכול להעלות חומרים"}
+          {/* Three matching entry points — one clean job each, same visual
+              weight, instead of the old dropzone-plus-list mix. */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowManageDialog(true)}
+              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+            >
+              <span className="flex items-center gap-3">
+                <FolderOpen size={18} className="text-[#ffb066]" />
+                <span className="flex flex-col items-start text-right">
+                  <span className="text-white">חומרי הקורס</span>
+                  <span className="text-[11px] text-neutral-500">
+                    {docsLoading
+                      ? "טוען..."
+                      : docsError
+                        ? docsError
+                        : documents.length === 0
+                          ? "העלה חומרי למידה"
+                          : `${documents.length} חומרים`}
+                  </span>
                 </span>
-                <span className="text-[10px] text-neutral-500 block mt-1">
-                  PDF / TXT — ייחתך ויוטמע · הקלטת הרצאה (MP3/WAV/M4A/MP4) — תתומלל אוטומטית ותוטמע
-                </span>
-              </button>
+              </span>
+              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+            </button>
 
-              {uploadStatus && !isUploading && (
-                <p className="text-xs text-red-400 text-center">{uploadStatus}</p>
-              )}
+            <Link
+              href={`/dashboard/${courseCode}/quiz`}
+              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+            >
+              <span className="flex items-center gap-3">
+                <GraduationCap size={18} className="text-[#ffb066]" />
+                <span className="text-white">התחל מבחן תרגול</span>
+              </span>
+              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+            </Link>
 
-              <div className="space-y-2">
-                {docsLoading ? (
-                  <p className="text-[11px] text-neutral-500 text-center flex items-center justify-center gap-1">
-                    <Loader2 size={12} className="animate-spin" /> טוען חומרים שהועלו...
-                  </p>
-                ) : docsError ? (
-                  <p className="text-[11px] text-red-400 text-center">{docsError}</p>
-                ) : documents.length === 0 ? (
-                  <p className="text-[11px] text-neutral-500 text-center">עדיין לא הועלו חומרים לקורס זה.</p>
-                ) : (
-                  documents.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center gap-2 p-2 bg-[#0a0e14] border border-[#242b3a] rounded text-xs text-neutral-300"
-                    >
-                      {doc.fileType === "audio" ? (
-                        <FileAudio size={14} className="text-[#ffb066] shrink-0" />
-                      ) : (
-                        <FileText size={14} className="text-[#ffb066] shrink-0" />
-                      )}
-                      <span className="truncate flex-1">{doc.title}</span>
-                      <span className="text-[10px] text-neutral-500 shrink-0">{doc.chunkCount} קטעים</span>
-                      <StatusBadge status={doc.status} />
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <Link
+              href={`/dashboard/${courseCode}/progress`}
+              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+            >
+              <span className="flex items-center gap-3">
+                <TrendingUp size={18} className="text-[#ffb066]" />
+                <span className="text-white">התקדמות בקורס</span>
+              </span>
+              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+            </Link>
+          </div>
         </div>
 
         {/* חלק שמאל: הצ'אט האמיתי */}
         <Card className="course-chat-card glass-panel border-[#242b3a] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
           <CardHeader className="border-b border-[#242b3a] pb-4">
             <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Bot className="text-[#ff7a3d]" size={22} />
+              <TutorAvatar className="text-[#ff7a3d]" size={22} />
               המורה הפרטי שלך לקורס
             </CardTitle>
             <CardDescription className="text-neutral-400 text-xs">שאל כל שאלה על החומר — המורה הפרטי מלמד ומסביר בהתבסס אך ורק על מסמכי הקורס שהעלית.</CardDescription>
@@ -428,7 +410,7 @@ export default function CoursePage() {
               return (
                 <div key={index} className={`msg-in flex gap-3 max-w-[85%] ${msg.role === "user" ? "mr-auto flex-row-reverse" : "ml-auto"}`}>
                   <div className={`p-2 rounded-full flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-[#ff7a3d] text-[#12161f]" : "bg-[#161b26] text-[#ffb066]"}`}>
-                    {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
+                    {msg.role === "user" ? <User size={16} /> : <TutorAvatar size={16} />}
                   </div>
                   <div className={`p-3 rounded-full text-sm leading-relaxed ${msg.role === "user" ? "bg-[#ff7a3d] text-[#12161f] text-left" : "bg-[#161b26] text-neutral-100"}`}>
                     {msg.role === "user" ? (
@@ -492,6 +474,20 @@ export default function CoursePage() {
         </Card>
 
       </div>
+
+      {pendingFile && (
+        <NameDocumentDialog file={pendingFile} onCancel={handleNameCancel} onConfirm={handleNameConfirm} />
+      )}
+      {showManageDialog && (
+        <ManageMaterialsDialog
+          documents={documents}
+          isUploading={isUploading}
+          uploadStatus={uploadStatus}
+          onRequestUpload={() => fileInputRef.current?.click()}
+          onClose={() => setShowManageDialog(false)}
+          onChanged={loadDocuments}
+        />
+      )}
     </div>
   )
 }

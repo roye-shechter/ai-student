@@ -173,6 +173,19 @@
     animation: typing-bounce 1.1s ease-in-out infinite;
   }
 
+  /* Tutor avatar's glow ring — a slow breathing pulse, the "alive and
+     attentive" cue a static icon can't carry on its own. */
+  .tutor-avatar-ring {
+    animation: tutor-pulse 2.5s ease-in-out infinite;
+  }
+
+  /* Ambient background's neural-thread lines — a slow traveling-signal
+     cue along the dash pattern, low-key enough to sit behind content. */
+  .ambient-thread {
+    stroke-dasharray: 6 10;
+    animation: thread-travel 7s linear infinite;
+  }
+
   /* A new item arriving in a live list (a chat bubble) — functional
      motion, not decoration: it marks "this is new" and plays once per
      node since the list only ever appends. */
@@ -242,10 +255,23 @@
   100% { transform: translateY(100%); opacity: 0; }
 }
 
+@keyframes tutor-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.18); opacity: 0.9; }
+}
+
+@keyframes thread-travel {
+  to { stroke-dashoffset: -32; }
+}
+
 @media (prefers-reduced-motion: reduce), (scripting: none) {
   [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
+  }
+  .tutor-avatar-ring,
+  .ambient-thread {
+    animation: none !important;
   }
 }
 

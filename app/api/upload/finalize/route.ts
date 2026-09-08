@@ -57,12 +57,21 @@ export async function POST(req: Request) {
     assertEmbeddingEnv()
 
     const payload = (await req.json().catch(() => null)) as
-      | { blobUrl?: string; fileName?: string; courseCode?: string; courseId?: string }
+      | { blobUrl?: string; fileName?: string; title?: string; courseCode?: string; courseId?: string }
       | null
     const blobUrl = payload?.blobUrl
+    // fileName is the raw OS filename — used only for extension-based type
+    // detection below (isPdf/isTxt/isAudio). `title` is the user-chosen
+    // display name (required — see components/name-document-dialog.tsx)
+    // and is what actually gets stored/cited; see the Document.create and
+    // ingestDocument() calls further down.
     const fileName = payload?.fileName
+    const title = typeof payload?.title === "string" ? payload.title.trim() : ""
     if (!blobUrl || !fileName) {
       return NextResponse.json({ error: "Missing blobUrl or fileName" }, { status: 400 })
+    }
+    if (!title) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 })
     }
 
     const course = payload?.courseId
@@ -149,7 +158,7 @@ export async function POST(req: Request) {
       data: {
         userId,
         courseId: course.id,
-        title: fileName,
+        title,
         fileType,
         fileSizeBytes: BigInt(bytes.byteLength),
       },
@@ -165,7 +174,10 @@ export async function POST(req: Request) {
           userId,
           courseId: course.id,
           documentId: document.id,
-          fileName,
+          // The user-chosen title, not the raw OS filename — this is what
+          // ends up on every DocumentChunk.fileName, i.e. what the AI cites
+          // in chat (lib/rag/chat.ts buildPrompt()).
+          fileName: title,
           uploadTimestamp: document.createdAt.getTime(),
           text,
         })
@@ -179,7 +191,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       documentId: document.id,
-      title: fileName,
+      title,
       status: document.status,
     })
   } catch (error) {

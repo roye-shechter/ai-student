@@ -6,18 +6,16 @@ import {
   CHAT_MODEL,
   EMBEDDING_MODEL,
   getAnthropic,
-  getIndex,
   getOpenAI,
   HARD_CHAT_MODEL,
-  namespaceForCourse,
-  tenantFilter,
+  toVectorSql,
 } from "./clients"
 
 /**
  * Retrieval + chat pipeline.
  *
  * 1. Embed the user query (OpenAI).
- * 2. Query Pinecone for the course namespace, filtered strictly by
+ * 2. Query document_chunks (pgvector) via cosine-distance ORDER BY, filtered strictly by
  *    { userId, courseId } so a tenant only ever sees their own chunks.
  * 3. Load recent ChatMessage history from Postgres (conversational memory).
  * 4. Assemble a structured prompt and answer with the LLM (Anthropic Claude).
@@ -151,10 +149,21 @@ async function embedQuery(query: string): Promise<number[]> {
   return res.data[0].embedding
 }
 
+type ChunkRow = {
+  documentId: string
+  chunkIndex: number
+  text: string
+  fileName: string
+  uploadedAt: Date
+  score: number
+}
+
 /**
- * Retrieve the most relevant chunks for a query, rigidly scoped to the tenant.
- * The course namespace partitions the data; the metadata filter is the hard
- * isolation boundary.
+ * Retrieve the most relevant chunks for a query, rigidly scoped to the
+ * tenant. `WHERE "userId" = ? AND "courseId" = ?` is the hard isolation
+ * boundary (every DocumentChunk row carries both directly, see
+ * prisma/schema.prisma) — an ANN search (pgvector HNSW index, cosine
+ * distance) then ranks within that already-filtered set.
  */
 export async function retrieveContext(args: {
   userId: string
@@ -164,22 +173,24 @@ export async function retrieveContext(args: {
 }): Promise<RetrievedChunk[]> {
   const { userId, courseId, query, topK = DEFAULT_TOP_K } = args
   const vector = await embedQuery(query)
+  const vectorSql = toVectorSql(vector)
 
-  const index = getIndex().namespace(namespaceForCourse(courseId))
-  const result = await index.query({
-    topK,
-    vector,
-    includeMetadata: true,
-    filter: tenantFilter(userId, courseId),
-  })
+  const rows = await prisma.$queryRaw<ChunkRow[]>`
+    SELECT "documentId", "chunkIndex", text, "fileName", "uploadedAt",
+           1 - (embedding <=> ${vectorSql}::vector) AS score
+    FROM document_chunks
+    WHERE "userId" = ${userId} AND "courseId" = ${courseId}
+    ORDER BY embedding <=> ${vectorSql}::vector
+    LIMIT ${topK}
+  `
 
-  return result.matches.map((match) => ({
-    text: match.metadata?.text ?? "",
-    score: match.score ?? 0,
-    documentId: match.metadata?.documentId ?? "",
-    chunkIndex: match.metadata?.chunkIndex ?? 0,
-    fileName: match.metadata?.fileName ?? "",
-    uploadTimestamp: match.metadata?.uploadTimestamp ?? 0,
+  return rows.map((row) => ({
+    text: row.text,
+    score: row.score,
+    documentId: row.documentId,
+    chunkIndex: row.chunkIndex,
+    fileName: row.fileName,
+    uploadTimestamp: row.uploadedAt.getTime(),
   }))
 }
 

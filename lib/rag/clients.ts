@@ -1,14 +1,17 @@
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
-import { Pinecone, type RecordMetadata } from "@pinecone-database/pinecone"
+import { toSql } from "pgvector"
 
 /**
  * Shared clients and constants for the RAG pipeline.
  *
  * Architecture (decoupled):
  *   - PostgreSQL/Neon (via Prisma) owns relational data: Users, Courses,
- *     Documents, ChatSession/ChatMessage history.
- *   - Pinecone owns the document-chunk embeddings (the vector search layer).
+ *     Documents, ChatSession/ChatMessage history — AND the chunk embeddings
+ *     themselves, via the pgvector extension (see DocumentChunk in
+ *     prisma/schema.prisma, and lib/rag/ingest.ts / lib/rag/chat.ts for the
+ *     raw SQL insert/query, since Prisma Client can't touch an
+ *     Unsupported("vector(1536)") column directly).
  *
  * Clients are created lazily (on first use) so that importing this module
  * never throws when env vars are absent — important for `next build`, which
@@ -43,26 +46,6 @@ export const CHAT_MODEL = "claude-sonnet-4-6"
  */
 export const HARD_CHAT_MODEL = "claude-opus-4-6"
 
-/**
- * Metadata stored on every Pinecone vector. `userId` + `courseId` are the
- * strict multi-tenancy keys: every vector carries them and every query filters
- * on them (see chat.ts) to prevent cross-tenant data leakage.
- *
- * Declared as a `type` (not `interface`) so it is assignable to Pinecone's
- * `RecordMetadata` (Record<string, string | number | boolean | string[]>).
- */
-export type ChunkMetadata = {
-  userId: string
-  courseId: string
-  documentId: string
-  chunkIndex: number
-  text: string
-  /** Original upload filename, so the AI can answer "based on the file X" queries. */
-  fileName: string
-  /** Upload time as epoch milliseconds, so the AI can reason about upload order. */
-  uploadTimestamp: number
-}
-
 let _openai: OpenAI | null = null
 export function getOpenAI(): OpenAI {
   if (!_openai) {
@@ -83,34 +66,15 @@ export function getAnthropic(): Anthropic {
   return _anthropic
 }
 
-let _pinecone: Pinecone | null = null
-export function getPinecone(): Pinecone {
-  if (!_pinecone) {
-    const apiKey = process.env.PINECONE_API_KEY
-    if (!apiKey) throw new Error("PINECONE_API_KEY is not set")
-    _pinecone = new Pinecone({ apiKey })
-  }
-  return _pinecone
-}
-
-/** The Pinecone index, typed with our chunk metadata. */
-export function getIndex() {
-  const indexName = process.env.PINECONE_INDEX
-  if (!indexName) throw new Error("PINECONE_INDEX is not set")
-  return getPinecone().index<ChunkMetadata>(indexName)
-}
-
 /**
- * Pinecone namespace for a course. Namespacing by course partitions vectors at
- * scale; userId+courseId metadata filtering (below) is what enforces tenancy.
+ * Format a raw embedding array as a Postgres `vector` literal for use in a
+ * $queryRaw/$executeRaw parameter cast to `::vector` — e.g.
+ * `sql\`... embedding <=> ${toVectorSql(v)}::vector ...\``. Tenant isolation
+ * for every read/write is a plain `WHERE "userId" = ? AND "courseId" = ?` —
+ * see retrieveContext() in chat.ts and ingestDocument() in ingest.ts.
  */
-export function namespaceForCourse(courseId: string): string {
-  return `course-${courseId}`
-}
-
-/** Strict metadata filter enforcing per-user, per-course isolation. */
-export function tenantFilter(userId: string, courseId: string) {
-  return { userId: { $eq: userId }, courseId: { $eq: courseId } }
+export function toVectorSql(embedding: number[]): string {
+  return toSql(embedding) as string
 }
 
 // =====================================================
@@ -131,14 +95,12 @@ export function requireEnv(name: string): string {
 }
 
 /**
- * Validate every key needed for embedding + vector storage (OpenAI + Pinecone).
- * Call at the start of any ingestion/retrieval path so a missing key fails
- * fast with a precise message instead of an opaque downstream error.
+ * Validate every key needed for embedding + vector storage. DATABASE_URL is
+ * already required for Prisma to function at all (see lib/prisma.ts), so the
+ * only RAG-specific key left to check here is the embedding API key.
  */
 export function assertEmbeddingEnv(): void {
   requireEnv("OPENAI_API_KEY")
-  requireEnv("PINECONE_API_KEY")
-  requireEnv("PINECONE_INDEX")
 }
 
 /** Validate the key needed for the chat LLM (Anthropic Claude). */

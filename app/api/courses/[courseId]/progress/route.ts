@@ -4,27 +4,34 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 /**
- * Real progress analytics for the main dashboard — replaces the hardcoded
- * `barData`/`pieData` placeholders that shipped with the original chart
- * cards. Two pieces, both derived from data the app already writes:
- *   - weeklyHours: from LearningSession (see lib/learning-session.ts),
- *     summed per week for the last 5 weeks.
- *   - averageScore / attemptCount: from QuizAttempt.scorePercentage —
- *     the "understanding" proxy for the donut chart.
- * Both come back possibly empty (a brand-new account has neither) — the
- * client is expected to render an honest empty state rather than a fake
- * chart when attemptCount/total hours are zero.
+ * Per-course progress analytics — same shape/logic as the old
+ * app/api/progress/summary/route.ts (now removed), just every query scoped
+ * by courseId too, so a student sees one course's learning data at a time
+ * instead of an account-wide rollup. Both pieces come from data the app
+ * already writes:
+ *   - weeklyHours: from LearningSession (lib/learning-session.ts), summed
+ *     per week for the last 5 weeks, filtered to this course.
+ *   - averageScore / attemptCount: from QuizAttempt.scorePercentage for
+ *     this course — the "understanding" proxy for the donut chart.
+ * Both come back possibly empty (no data yet for this course) — the client
+ * renders an honest empty state rather than a fake chart.
  */
 
 const WEEKS_BACK = 5
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000
 
-export async function GET() {
+export async function GET(_req: Request, ctx: { params: Promise<{ courseId: string }> }) {
   try {
     const session = await getServerSession(authOptions)
     const userId = session?.user?.id
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { courseId } = await ctx.params
+    const course = await prisma.course.findUnique({ where: { id: courseId } })
+    if (!course) {
+      return NextResponse.json({ error: "Unknown course" }, { status: 404 })
     }
 
     const now = new Date()
@@ -38,7 +45,7 @@ export async function GET() {
     const weeklyHours = await Promise.all(
       weekRanges.map(async ({ label, start, end }) => {
         const sessions = await prisma.learningSession.findMany({
-          where: { userId, sessionStart: { gte: start, lt: end } },
+          where: { userId, courseId, sessionStart: { gte: start, lt: end } },
           select: { durationMinutes: true },
         })
         const minutes = sessions.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0)
@@ -47,13 +54,13 @@ export async function GET() {
     )
 
     const scoreAgg = await prisma.quizAttempt.aggregate({
-      where: { userId, scorePercentage: { not: null } },
+      where: { userId, courseId, scorePercentage: { not: null } },
       _avg: { scorePercentage: true },
       _count: { scorePercentage: true },
     })
 
     const weakTopicRows = await prisma.quizQuestion.findMany({
-      where: { isCorrect: false, quizAttempt: { userId } },
+      where: { isCorrect: false, quizAttempt: { userId, courseId } },
       select: { topic: true },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -69,13 +76,14 @@ export async function GET() {
       .map(([topic, count]) => ({ topic, count }))
 
     return NextResponse.json({
+      courseName: course.courseName,
       weeklyHours,
       averageScore: scoreAgg._avg.scorePercentage,
       attemptCount: scoreAgg._count.scorePercentage,
       weakTopics,
     })
   } catch (error) {
-    console.error("[CRITICAL_ERROR] Route /api/progress/summary failed:", error)
+    console.error("[CRITICAL_ERROR] Route /api/courses/[courseId]/progress failed:", error)
     const message = error instanceof Error ? error.message : "Unexpected server error"
     return NextResponse.json({ error: message }, { status: 500 })
   }

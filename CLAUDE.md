@@ -18,20 +18,34 @@
 
 ## סטאק
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind 4 · shadcn/ui ·
-Prisma 7 + PostgreSQL (Neon) · NextAuth v4 (Credentials, JWT) ·
-Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Pinecone (וקטורים)
+Prisma 7 + PostgreSQL/Neon **עם pgvector** (הווקטורים חיים ב-Postgres עצמו,
+ראו למטה) · NextAuth v4 (Credentials, JWT) ·
+Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Vercel Blob (קבצים)
 
 ⚠️ ראה AGENTS.md למעלה — גרסת Next.js הזו כוללת breaking changes מול training data.
 
 ## ארכיטקטורה — דפוסים לשמור עליהם
-- **RAG pipeline** חי ב-`lib/rag/`: `clients.ts` (קליינטים משותפים + ולידציית env),
-  `extract-text.ts` (זיהוי סוג קובץ + חילוץ טקסט מ-PDF), `ingest.ts` (חיתוך→embedding→
-  Pinecone), `chat.ts` (retrieval→prompt→Claude, כולל `chatStream()` — הגרסה הפעילה,
-  streaming NDJSON).
+- **RAG pipeline** חי ב-`lib/rag/`: `clients.ts` (קליינטים משותפים + ולידציית env +
+  `toVectorSql()`), `extract-text.ts` (זיהוי סוג קובץ + חילוץ טקסט מ-PDF), `ingest.ts`
+  (חיתוך→embedding→pgvector), `chat.ts` (retrieval→prompt→Claude, כולל `chatStream()`
+  — הגרסה הפעילה, streaming NDJSON).
+- **וקטורים ב-Postgres, לא בשירות חיצוני** (`DocumentChunk` ב-`prisma/schema.prisma`,
+  עמודת `embedding` מסוג `Unsupported("vector(1536)")` — Prisma Client לא יכול
+  לגעת בה ישירות, כל קריאה/כתיבה עוברת דרך `$queryRaw`/`$executeRaw`). **בידוד
+  דיירים** הוא `WHERE "userId" = ? AND "courseId" = ?` רגיל על כל שורה — לא
+  לשבור את זה אף פעם. יש אינדקס HNSW (`document_chunks_embedding_hnsw`,
+  `vector_cosine_ops`) שנוצר ידנית (Prisma `db push` לא בונה HNSW באופן
+  דקלרטיבי בגרסה הזו) — אם ה-schema משתנה בעתיד ודורש push מחדש של הטבלה,
+  לוודא שהאינדקס עדיין קיים (`SELECT indexname FROM pg_indexes WHERE
+  tablename = 'document_chunks'`), וליצור מחדש אם לא.
+  **היסטוריה:** עברנו מ-Pinecone (2026-09) כי התוכנית החינמית שלו מוגבלת ל-100
+  namespaces לכל אינדקס, וה-app יצר namespace לכל קורס — קיר שנתקלים בו סביב
+  100 קורסים בסך הכול, הרבה לפני "אלפי משתמשים". כל הנתונים (25 מסמכים, 357
+  קטעים) הועברו בהצלחה מ-Pinecone (לפני מחיקתו) ל-`document_chunks`.
 - **העלאת מסמכים** (`app/api/upload/token` + `app/api/upload/finalize`): הקובץ עולה
   ישירות מהדפדפן ל-Vercel Blob (עוקף את מגבלת ה-body של ~4.5MB שיש לפונקציות
   serverless), ולא דרך גוף הבקשה שלנו. `finalize` יוצר `Document` בסטטוס
-  `pending` ומחזיר תשובה מיד; חיתוך/embedding/Pinecone רצים ברקע דרך
+  `pending` ומחזיר תשובה מיד; חיתוך/embedding/insert רצים ברקע דרך
   `after()` מ-`next/server` (לא חוסם את הלקוח, ולא כפוף למגבלת body). ה-UI
   (`app/dashboard/[courseCode]/page.tsx`) עושה polling על `/api/documents` כל
   שיש `status` של `pending`/`processing`, ומציג אותו דרך `StatusBadge` הקיים.
@@ -39,8 +53,6 @@ Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Pinecone (ו�
   (קבצים מעל ~4.5MB נכשלו בשקט ברמת הפלטפורמה, לפני שהקוד שלנו בכלל רץ).
 - **Routes דקים**: כל `app/api/**/route.ts` עושה auth → rate-limit → delegate ל-`lib/`,
   לא לוגיקה עסקית ב-route עצמו.
-- **בידוד דיירים (tenant isolation)**: כל שאילתת Pinecone מסוננת לפי `{userId, courseId}` —
-  זו גבול אבטחה קשיח, לא לשבור אותו אף פעם.
 - **UI**: כל הטקסט למשתמש בעברית, RTL.
 - Next.js 16: auth gate הוא `proxy.ts` בשורש (**לא** `middleware.ts` הישן).
 - Rate limiting: `lib/rate-limit.ts` — `assertUnderDailyLimit(userId, kind)`,
@@ -48,12 +60,17 @@ Anthropic SDK (צ'אט) · OpenAI SDK (embeddings + תמלול) · Pinecone (ו�
 
 ## משתני סביבה נדרשים
 ראה `.env.example` — `DATABASE_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, `PINECONE_API_KEY`/`PINECONE_INDEX`.
+`OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`. (אין יותר מפתח וקטור-DB נפרד —
+הווקטורים ב-Postgres עצמו, ראו מעלה.)
 
 ## פקודות נפוצות
 `npm run dev` · `npx prisma db push` (⚠️ **לא** `migrate dev` — אין תיקיית
 `prisma/migrations` בפרויקט; `migrate dev` עלול לנסות ליצור baseline ולאפס
 את הסכמה) · `npx prisma studio`
+
+⚠️ ה-`extensions = [vector]` ב-`datasource` וה-`previewFeatures =
+["postgresqlExtensions"]` ב-`generator` הכרחיים ל-`db push` — בלעדיהם
+Prisma זורק שגיאה על עמודת ה-`embedding`. אל תסירו אותם.
 
 ## עבודה במקביל (כמה סשנים/סוכנים)
 `app/api/chat/route.ts` ו-`lib/rag/chat.ts` הם קבצים "חמים" בשיתוף — לתאם

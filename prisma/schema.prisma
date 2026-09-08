@@ -2,11 +2,13 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // =====================================================
@@ -228,31 +230,55 @@ model UsageCounter {
 }
 
 // =====================================================
-// RAG Models (decoupled: relational only — vectors live in Pinecone)
+// RAG Models (embeddings live in Postgres via pgvector — see DocumentChunk)
 // =====================================================
 
-// Tracks an uploaded file. The chunk embeddings themselves are stored in
-// Pinecone (not here); this row records ingestion status and bookkeeping.
+// Tracks an uploaded file. The chunk embeddings themselves live in
+// DocumentChunk; this row records ingestion status and bookkeeping.
 model Document {
-  id                String   @id @default(cuid())
-  userId            String
-  courseId          String
-  title             String
-  fileType          String?
-  fileSizeBytes     BigInt?
-  status            String   @default("pending") // pending | processing | indexed | failed
-  chunkCount        Int      @default(0)
-  pineconeNamespace String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  courseId      String
+  title         String
+  fileType      String?
+  fileSizeBytes BigInt?
+  status        String   @default("pending") // pending | processing | indexed | failed
+  chunkCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks DocumentChunk[]
 
   @@index([userId])
   @@index([courseId])
   @@index([userId, courseId])
   @@map("documents")
+}
+
+// One embedded chunk of a Document's text. `embedding` is a pgvector column
+// (Unsupported — Prisma Client can't read/write it directly; every insert
+// and similarity search goes through $executeRaw/$queryRaw, see
+// lib/rag/ingest.ts and lib/rag/chat.ts). Tenant isolation is a plain SQL
+// `WHERE userId = ? AND courseId = ?`, denormalized onto every row instead
+// of relying on a join, so retrieval stays a single indexed query.
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  courseId   String
+  chunkIndex Int
+  text       String
+  fileName   String
+  uploadedAt DateTime
+  embedding  Unsupported("vector(1536)")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([userId, courseId])
+  @@map("document_chunks")
 }
 
 // A course-specific conversation thread for a user.

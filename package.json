@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:errors": "tsx scripts/test-error-handling.mjs",
+    "test:rag": "tsx scripts/test-rag.mjs",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -18,7 +19,6 @@
     "@base-ui/react": "^1.5.0",
     "@gsap/react": "^2.1.2",
     "@next-auth/prisma-adapter": "^1.0.7",
-    "@pinecone-database/pinecone": "^8.0.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@vercel/blob": "^2.8.0",
@@ -33,6 +33,7 @@
     "openai": "^6.44.0",
     "pdf2json": "^4.0.3",
     "pg": "^8.22.0",
+    "pgvector": "^0.3.0",
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
