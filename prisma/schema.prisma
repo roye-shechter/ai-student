@@ -90,6 +90,7 @@ model User {
   chatSessions  ChatSession[]
   createdCourses Course[]      @relation("CreatedCourses")
   usageCounters UsageCounter[]
+  activityEvents ActivityEvent[]
 
   @@index([email])
   @@index([username])
@@ -251,6 +252,29 @@ model UsageCounter {
   @@unique([userId, day])
   @@index([userId])
   @@map("usage_counters")
+}
+
+// Coarse activity/audit log for the admin dashboard (app/admin) — logs
+// meaningful milestones only (login, course created, document uploaded,
+// quiz completed), NOT every chat message/request (those stay aggregated
+// in UsageCounter above). Deliberately lean: lib/activity-log.ts prunes
+// rows older than its retention window on write, so this table stays
+// bounded instead of growing forever on the free-tier DB.
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // "login" | "course_created" | "document_uploaded" | "quiz_completed"
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("activity_events")
 }
 
 // =====================================================

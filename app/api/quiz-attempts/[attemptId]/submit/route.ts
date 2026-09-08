@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { gradeShortAnswers, type ShortAnswerToGrade } from "@/lib/rag/quiz"
 import { assertLlmEnv } from "@/lib/rag/clients"
+import { logActivity } from "@/lib/activity-log"
 
 /**
  * Quiz grading endpoint. MCQ questions are graded deterministically in
@@ -135,6 +136,12 @@ export async function POST(
     await prisma.quizAttempt.update({
       where: { id: attempt.id },
       data: { scorePercentage, correctAnswers, totalQuestions, timeSpentSeconds },
+    })
+
+    await logActivity({
+      userId,
+      type: "quiz_completed",
+      metadata: { attemptId: attempt.id, courseId: attempt.courseId, scorePercentage },
     })
 
     return NextResponse.json({

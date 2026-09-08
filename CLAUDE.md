@@ -71,6 +71,29 @@ type])`. אלה עובדות **ברמת הקורס, לא לפי משתמש** (כ
 (`lib/exam-dates.ts`'s `dateOnlyToUTC`/`formatDateOnly*`) — לעולם לא Date עם
 שעה אמיתית, כדי שהתאריך שנבחר לא יזוז יום בגלל timezone.
 
+## פרופיל משתמש
+`User` (`prisma/schema.prisma`) מחזיק `institution`, `degree`, `studyYear`,
+`age` — כולם נשאלים חובה ב-`OnboardingModal` (בכניסה הראשונה, לפני
+`onboardingCompleted=true`) ואפשר לערוך אחר כך דרך "הגדרות פרופיל" בדשבורד
+הראשי (`ProfileSettingsDialog`, `PATCH /api/me`).
+
+## פאנל ניהול (`/admin`)
+דשבורד אנליטיקה למשתמש בלבד (לא מקושר מה-UI הרגיל) — **לא** קשור ל-NextAuth
+session; שער נפרד (`lib/admin-auth.ts`): בוחרים שם מתוך שתי זהויות קבועות
+(`ADMIN_PROFILES`), מזינים סיסמה משותפת (`ADMIN_PASSCODE` env, ברירת מחדל
+"777"), ומקבלים cookie חתום ב-HMAC (`NEXTAUTH_SECRET`). כל route תחת
+`app/api/admin/**` בודק את ה-cookie הזה בעצמו (`requireAdmin()`) — לא סומך
+על ה-UI.
+
+מעקב פעילות (`ActivityEvent`, `lib/activity-log.ts`'s `logActivity()`) הוא
+**גס בכוונה**, לא לוג של כל בקשה — נרשמים רק אירועים משמעותיים: `login`
+(כולל IP/User-Agent, מ-`lib/auth.ts`'s `authorize()`), `course_created`,
+`document_uploaded`, `quiz_completed`. ספירות "כמה בקשות" בדשבורד מגיעות
+מ-`UsageCounter` הקיים (כבר קיים למכסות יומיות, לא טבלה חדשה). זמן למידה
+מגיע מ-`LearningSession` הקיים. הטבלה `ActivityEvent` נגזמת אוטומטית
+(`logActivity` מוחק שורות מעל 90 יום ב-~5% מהכתיבות) כדי להישאר קטנה ב-DB
+החינמי — **אל תוסיפו** לוג לכל הודעת צ'אט/בקשת API, רק אבני דרך.
+
 ## משתני סביבה נדרשים
 ראה `.env.example` — `DATABASE_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`,
 `OPENAI_API_KEY`, `BLOB_READ_WRITE_TOKEN`. (אין יותר מפתח וקטור-DB נפרד —

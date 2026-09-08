@@ -5,6 +5,7 @@ import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { dateOnlyToUTC } from "@/lib/exam-dates"
+import { logActivity } from "@/lib/activity-log"
 
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date")
 
@@ -145,6 +146,8 @@ export async function POST(req: Request) {
         console.error("[CRITICAL_ERROR] ExamDate creation after course creation failed:", examDateError)
       }
     }
+
+    await logActivity({ userId, type: "course_created", metadata: { courseId: course.id, courseName: course.courseName } })
 
     return NextResponse.json({ course }, { status: 201 })
   } catch (error) {

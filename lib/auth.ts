@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
+import { logActivity, extractIp, extractUserAgent } from "@/lib/activity-log"
 
 // Validation schemas
 const loginSchema = z.object({
@@ -29,7 +30,7 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         try {
           // Validate input
           const { username, password } = loginSchema.parse(credentials)
@@ -59,6 +60,20 @@ export const authOptions: NextAuthOptions = {
           await prisma.user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() }
+          })
+
+          // Feeds the admin dashboard's per-user IP history (app/admin).
+          // Awaited (not fire-and-forget) — on serverless this function's
+          // process can be frozen right after the response goes out, which
+          // would silently drop an un-awaited write. req.headers here is a
+          // plain object, not a Headers instance, in next-auth v4's
+          // CredentialsProvider. logActivity itself never throws.
+          const headers = (req?.headers ?? {}) as Record<string, string | string[] | undefined>
+          await logActivity({
+            userId: user.id,
+            type: "login",
+            ip: extractIp(headers),
+            userAgent: extractUserAgent(headers),
           })
 
           // Return user object

@@ -8,6 +8,7 @@ import { assertEmbeddingEnv } from "@/lib/rag/clients"
 import { transcribeAudio } from "@/lib/rag/transcribe"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
 import { isPdf, isTxt, isAudio, extractPdfText } from "@/lib/rag/extract-text"
+import { logActivity } from "@/lib/activity-log"
 
 /**
  * Document ingestion — finalize step.
@@ -162,6 +163,12 @@ export async function POST(req: Request) {
         fileType,
         fileSizeBytes: BigInt(bytes.byteLength),
       },
+    })
+
+    await logActivity({
+      userId,
+      type: "document_uploaded",
+      metadata: { documentId: document.id, title, fileType, courseId: course.id },
     })
 
     // Respond immediately — the client polls /api/documents for status.
