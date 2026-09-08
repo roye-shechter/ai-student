@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Loader2, Sparkles, Plus } from "lucide-react"
 import { OnboardingModal } from "@/components/onboarding-modal"
+import { ProfileSettingsDialog } from "@/components/profile-settings-dialog"
 import { CreateCourseDialog } from "@/components/create-course-dialog"
 import { CourseIllustration } from "@/components/course-illustration"
 import { DashboardExamCalendar } from "@/components/dashboard-exam-calendar"
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateCourse, setShowCreateCourse] = useState(false)
+  const [showProfileSettings, setShowProfileSettings] = useState(false)
 
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -116,6 +118,7 @@ export default function Dashboard() {
       {showCreateCourse && (
         <CreateCourseDialog onClose={() => setShowCreateCourse(false)} onCreated={handleCourseCreated} />
       )}
+      {showProfileSettings && <ProfileSettingsDialog onClose={() => setShowProfileSettings(false)} />}
 
       <div className="max-w-6xl mx-auto space-y-10">
 
@@ -129,7 +132,11 @@ export default function Dashboard() {
               ברוך הבא, <span className="text-[#ffb066]">{displayName}</span>. הנה סיכום מצב הלמידה שלך.
             </p>
           </div>
-          <Button variant="outline" className="bg-transparent border-[#242b3a] text-[#8b93a3] hover:bg-[#161b26] hover:text-[#ffb066] hover:border-[#ff7a3d]/50 rounded-sm transition-all duration-300">
+          <Button
+            onClick={() => setShowProfileSettings(true)}
+            variant="outline"
+            className="bg-transparent border-[#242b3a] text-[#8b93a3] hover:bg-[#161b26] hover:text-[#ffb066] hover:border-[#ff7a3d]/50 rounded-sm transition-all duration-300"
+          >
             הגדרות פרופיל
           </Button>
         </header>

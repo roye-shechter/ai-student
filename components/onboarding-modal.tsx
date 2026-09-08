@@ -13,16 +13,20 @@ const STUDY_YEARS = ["שנה א'", "שנה ב'", "שנה ג'", "שנה ד'", "ת
 /**
  * Forced onboarding modal. Rendered (and held open) by the dashboard whenever
  * the user's onboardingCompleted flag is false. Collects the academic
- * institution and the year of study, then persists both via /api/onboarding.
- * Courses are no longer picked here — users create their own from the dashboard.
+ * institution, degree/major, year of study, and age, then persists all four
+ * via /api/onboarding. Courses are no longer picked here — users create
+ * their own from the dashboard.
  */
 export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
   const [institution, setInstitution] = useState("")
+  const [degree, setDegree] = useState("")
   const [studyYear, setStudyYear] = useState("")
+  const [age, setAge] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canSubmit = institution.trim().length > 0 && studyYear.trim().length > 0 && !submitting
+  const canSubmit =
+    institution.trim().length > 0 && degree.trim().length > 0 && studyYear.trim().length > 0 && age.trim().length > 0 && !submitting
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -32,7 +36,12 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ institution: institution.trim(), studyYear: studyYear.trim() }),
+        body: JSON.stringify({
+          institution: institution.trim(),
+          degree: degree.trim(),
+          studyYear: studyYear.trim(),
+          age: Number(age),
+        }),
       })
       const data = await readJson<{ error?: string }>(res)
       if (!res.ok || !data) {
@@ -69,6 +78,17 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="degree" className="text-neutral-200">תואר / תחום לימוד</Label>
+            <Input
+              id="degree"
+              placeholder="לדוגמה: מדעי המחשב, הנדסת חשמל..."
+              value={degree}
+              onChange={(e) => setDegree(e.target.value)}
+              className="bg-[#161b26] border-[#242b3a] text-white focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="studyYear" className="text-neutral-200">שנת לימוד</Label>
             <select
               id="studyYear"
@@ -81,6 +101,20 @@ export function OnboardingModal({ onCompleted }: { onCompleted: () => void }) {
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="age" className="text-neutral-200">גיל</Label>
+            <Input
+              id="age"
+              type="number"
+              min={14}
+              max={120}
+              placeholder="לדוגמה: 23"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              className="bg-[#161b26] border-[#242b3a] text-white focus-visible:ring-[#ff7a3d] focus-visible:border-[#ff7a3d]"
+            />
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}

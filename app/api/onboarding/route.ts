@@ -6,13 +6,16 @@ import { prisma } from "@/lib/prisma"
 
 const onboardingSchema = z.object({
   institution: z.string().trim().min(1, "Institution is required"),
+  degree: z.string().trim().min(1, "Degree is required"),
   studyYear: z.string().trim().min(1, "Study year is required"),
+  age: z.coerce.number().int().min(14, "Age must be at least 14").max(120, "Invalid age"),
 })
 
 /**
- * Complete user onboarding: save the institution + year of study and flip
- * onboardingCompleted to true. Courses are no longer chosen here — users
- * create their own custom courses from the dashboard after onboarding.
+ * Complete user onboarding: save the institution, degree, year of study and
+ * age, then flip onboardingCompleted to true. Courses are no longer chosen
+ * here — users create their own custom courses from the dashboard after
+ * onboarding.
  */
 export async function POST(req: Request) {
   try {
@@ -31,11 +34,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    const { institution, studyYear } = parsed
+    const { institution, degree, studyYear, age } = parsed
 
     await prisma.user.update({
       where: { id: userId },
-      data: { institution, studyYear, onboardingCompleted: true },
+      data: { institution, degree, studyYear, age, onboardingCompleted: true },
     })
 
     return NextResponse.json({ ok: true })
