@@ -12,23 +12,43 @@
 
 // Fixed node positions (percent of viewport), reused for both the dot
 // markers and the SVG thread endpoints below — not randomized, so the
-// page never shifts between loads.
+// page never shifts between loads. Spread across the full viewport (not
+// just the hero band up top) so the network reads as a network on every
+// page, including ones like the dashboard where a header sits over the
+// first ~15% of the screen.
 const NODES = [
-  { top: 8, left: 12, size: 3 },
-  { top: 14, left: 82, size: 2 },
-  { top: 26, left: 68, size: 2 },
-  { top: 5, left: 40, size: 2 },
-  { top: 22, left: 22, size: 3 },
+  { top: 8, left: 10, size: 3 },
+  { top: 15, left: 32, size: 2 },
+  { top: 6, left: 55, size: 2 },
+  { top: 20, left: 78, size: 3 },
+  { top: 35, left: 16, size: 2 },
+  { top: 44, left: 44, size: 3 },
+  { top: 32, left: 90, size: 2 },
+  { top: 58, left: 27, size: 2 },
+  { top: 64, left: 62, size: 3 },
+  { top: 78, left: 40, size: 2 },
+  { top: 82, left: 84, size: 2 },
+  { top: 92, left: 12, size: 2 },
 ] as const
 
-// Index pairs into NODES — deliberately not fully connected (a sparse
-// graph reads as a network; a complete one just reads as clutter).
+// Index pairs into NODES — a sparse, organic mesh (each node reaching a
+// couple of near neighbors) rather than a fully connected graph, so it
+// reads as a network/synapse diagram instead of clutter.
 const THREADS: [number, number][] = [
-  [0, 3],
-  [3, 1],
-  [3, 2],
-  [0, 4],
-  [4, 2],
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [1, 4],
+  [4, 5],
+  [5, 6],
+  [3, 6],
+  [4, 7],
+  [5, 8],
+  [7, 9],
+  [8, 9],
+  [8, 10],
+  [9, 11],
+  [7, 11],
 ]
 
 export function AmbientTexture() {
@@ -72,20 +92,32 @@ export function AmbientTexture() {
         }}
       />
 
-      {/* A few scattered nodes, like distant instrument-panel indicators —
-          fixed positions, not randomized, so the page never shifts. */}
+      {/* Scattered "neuron" nodes with a soft glow + slow breathing pulse,
+          each on its own offset so they don't fire in lockstep — fixed
+          positions, not randomized, so the page never shifts. */}
       {NODES.map((d, i) => (
         <div
           key={i}
-          className="absolute rounded-full bg-[#ffb066]"
-          style={{ top: `${d.top}%`, left: `${d.left}%`, width: d.size, height: d.size, opacity: 0.35 }}
+          className="ambient-node absolute rounded-full bg-[#ffb066]"
+          style={{
+            top: `${d.top}%`,
+            left: `${d.left}%`,
+            width: d.size,
+            height: d.size,
+            opacity: 0.4,
+            boxShadow: `0 0 ${d.size * 3}px ${d.size}px rgba(255,176,102,0.25)`,
+            animationDelay: `${(i * -0.85).toFixed(2)}s`,
+          }}
         />
       ))}
 
       {/* Thin lines wiring the nodes together, with a slow traveling-dash
           pulse — the same node field, now read as a synapse/network
           diagram instead of just floating instrument dots: a quiet nod to
-          "this is a learning brain," not a literal illustration of one. */}
+          "this is a learning brain," not a literal illustration of one.
+          Each thread's dash animation starts at a different offset (a
+          negative delay) so the "signal" travels asynchronously across
+          the mesh instead of every line pulsing in unison. */}
       <svg
         className="absolute inset-0 w-full h-full"
         viewBox="0 0 100 100"
@@ -104,6 +136,7 @@ export function AmbientTexture() {
             strokeWidth="1.4"
             strokeOpacity="0.4"
             vectorEffect="non-scaling-stroke"
+            style={{ animationDelay: `${(i * -0.5).toFixed(2)}s` }}
           />
         ))}
       </svg>

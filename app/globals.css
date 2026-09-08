@@ -186,6 +186,13 @@
     animation: thread-travel 7s linear infinite;
   }
 
+  /* Ambient background's neuron nodes — a slow glow breathing, offset per
+     node (see ambient-texture.tsx's animationDelay) so the mesh reads as
+     asynchronous neural activity rather than one synchronized blink. */
+  .ambient-node {
+    animation: node-pulse 4s ease-in-out infinite;
+  }
+
   /* A new item arriving in a live list (a chat bubble) — functional
      motion, not decoration: it marks "this is new" and plays once per
      node since the list only ever appends. */
@@ -264,13 +271,19 @@
   to { stroke-dashoffset: -32; }
 }
 
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.6); }
+}
+
 @media (prefers-reduced-motion: reduce), (scripting: none) {
   [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
   }
   .tutor-avatar-ring,
-  .ambient-thread {
+  .ambient-thread,
+  .ambient-node {
     animation: none !important;
   }
 }
