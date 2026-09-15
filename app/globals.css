@@ -179,24 +179,26 @@
     animation: tutor-pulse 2.5s ease-in-out infinite;
   }
 
-  /* Ambient background's neural-thread lines — a slow traveling-signal
-     cue along the dash pattern, low-key enough to sit behind content. */
-  .ambient-thread {
-    stroke-dasharray: 6 10;
-    animation: thread-travel 7s linear infinite;
-  }
-
-  /* Ambient background's neuron nodes (SVG <circle>s) — a slow glow
-     breathing, offset per node (see ambient-texture.tsx's animationDelay)
-     so the mesh reads as asynchronous neural activity rather than one
-     synchronized blink. transform-box/-origin: scale from each circle's
-     own center, not the SVG canvas's (0,0) — the CSS default for SVG
-     shapes, which would otherwise make every node drift toward the
-     bottom-right as it "pulses" instead of growing in place. */
-  .ambient-node {
+  /* Ambient background's particle orb — each point twinkles on its own
+     cycle (duration/delay set per-particle inline, see
+     ambient-texture.tsx) while the whole cluster turns slowly, reading as
+     a glowing sphere of light rather than a static ring. transform-box:
+     fill-box/center scales each circle from its own middle, not the SVG
+     canvas's (0,0) — the CSS default for SVG shapes, which would
+     otherwise make every particle drift as it "twinkles" instead of
+     pulsing in place. */
+  .ambient-orb-particle {
     transform-box: fill-box;
     transform-origin: center;
-    animation: node-pulse 4s ease-in-out infinite;
+    animation-name: orb-twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+
+  .ambient-orb-group {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: orb-spin 150s linear infinite;
   }
 
   /* A new item arriving in a live list (a chat bubble) — functional
@@ -273,13 +275,13 @@
   50% { transform: scale(1.18); opacity: 0.9; }
 }
 
-@keyframes thread-travel {
-  to { stroke-dashoffset: -32; }
+@keyframes orb-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.25); }
 }
 
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(1.6); }
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce), (scripting: none) {
@@ -288,8 +290,8 @@
     transform: none !important;
   }
   .tutor-avatar-ring,
-  .ambient-thread,
-  .ambient-node {
+  .ambient-orb-particle,
+  .ambient-orb-group {
     animation: none !important;
   }
 }
