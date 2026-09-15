@@ -1,62 +1,76 @@
 /**
  * Atmospheric backdrop for the "AI Platform" identity: a deep navy canvas
- * with one warm amber glow — the same move dark AI-product hero sections
- * lean on (a soft radial light source standing in for a photograph, not a
- * flat color block) — sitting behind every page instead of only a marketing
- * hero. The glow itself is positioned, not animated; a dense particle
- * network (see BRAIN_NODES/BRAIN_EDGES below), sharing the glow's exact
- * bounding box, is the one deliberate motion cue. It's built from two
- * overlapping density clusters (left/right "hemispheres") plus a smaller
- * lower one — an organic node density that *suggests* a brain through
- * where the particles cluster, deliberately with no drawn outline/contour
- * around it, matching the app's restrained-not-literal visual language.
- * Points/edges are pre-generated offline with a seeded RNG (not computed
- * at runtime) so they're fixed and never shift between loads. Server
- * component: the animation is pure CSS, so this still costs nothing at
- * runtime.
+ * lit by one warm amber glow, sitting behind every page instead of only a
+ * marketing hero. The glow's core is a particle orb — a dense cluster of
+ * small points concentrated at the center and thinning toward the edge,
+ * each softly twinkling on its own cycle while the whole cluster drifts in
+ * a slow, continuous rotation — the same "constellation sphere" read as a
+ * cloud of light rather than a flat circle. Points are pre-generated
+ * offline with a seeded RNG (not computed at runtime) so they're fixed and
+ * never shift between loads. Server component: the animation is pure CSS,
+ * so this still costs nothing at runtime.
  */
 
 // prettier-ignore
-const BRAIN_NODES = [
-  { x: 611.2, y: 283.6, size: 1.4 }, { x: 428.2, y: 206.3, size: 2 }, { x: 366.7, y: 291.3, size: 1.4 },
-  { x: 341.7, y: 226.9, size: 1.4 }, { x: 405, y: 341.6, size: 1.4 }, { x: 311.9, y: 227.3, size: 1.4 },
-  { x: 772, y: 176.7, size: 1.4 }, { x: 390.7, y: 240.9, size: 2 }, { x: 466.5, y: 380.2, size: 1.4 },
-  { x: 331, y: 313.5, size: 1.4 }, { x: 338.3, y: 268.5, size: 2 }, { x: 190.8, y: 173.9, size: 2 },
-  { x: 433.1, y: 397, size: 1.4 }, { x: 361.1, y: 287.5, size: 1.4 }, { x: 492.8, y: 346.8, size: 1.4 },
-  { x: 324.7, y: 231.6, size: 1.4 }, { x: 519, y: 257, size: 3 }, { x: 507.8, y: 191.9, size: 2 },
-  { x: 423.2, y: 72.6, size: 1.4 }, { x: 729.6, y: 211.4, size: 2 }, { x: 395.7, y: 161.5, size: 1.4 },
-  { x: 250.2, y: 231.3, size: 1.4 }, { x: 627.2, y: 219.5, size: 1.4 }, { x: 318.4, y: 285.6, size: 2 },
-  { x: 271.6, y: 395.1, size: 1.4 }, { x: 517.4, y: 181.4, size: 2 }, { x: 535.1, y: 336.9, size: 1.4 },
-  { x: 200.2, y: 148, size: 2 }, { x: 488.4, y: 192.4, size: 1.4 }, { x: 386.3, y: 355.5, size: 1.4 },
-  { x: 463.3, y: 195, size: 1.4 }, { x: 619.2, y: 222.4, size: 1.4 }, { x: 509.4, y: 272.7, size: 2 },
-  { x: 506.4, y: 263.3, size: 1.4 }, { x: 663.4, y: 300.3, size: 1.4 }, { x: 485.6, y: 416.2, size: 1.4 },
-  { x: 241.3, y: 235.4, size: 1.4 }, { x: 451, y: 502.5, size: 1.4 }, { x: 318.1, y: 310.9, size: 1.4 },
-  { x: 586, y: 212.3, size: 1.4 }, { x: 456.2, y: 207.8, size: 2 }, { x: 431.6, y: 415.7, size: 1.4 },
-  { x: 599.3, y: 238.6, size: 2 }, { x: 430.2, y: 423.8, size: 1.4 }, { x: 550.6, y: 129.2, size: 2 },
-  { x: 559.3, y: 269.1, size: 1.4 }, { x: 434.4, y: 151.8, size: 1.4 }, { x: 487.4, y: 88.7, size: 1.4 },
-  { x: 264.5, y: 179, size: 2 }, { x: 560, y: 275.6, size: 1.4 }, { x: 394.9, y: 443.8, size: 1.4 },
-  { x: 385.2, y: 186.2, size: 1.4 }, { x: 368, y: 271.6, size: 3 }, { x: 475.5, y: 385.5, size: 2 },
-  { x: 349.7, y: 213.9, size: 1.4 }, { x: 558.7, y: 191.2, size: 1.4 }, { x: 311.4, y: 388, size: 1.4 },
-  { x: 380.9, y: 423.6, size: 1.4 }, { x: 575.6, y: 124.2, size: 1.4 }, { x: 497.6, y: 164.1, size: 2 },
-  { x: 452.8, y: 351.4, size: 1.4 }, { x: 498.7, y: 232.8, size: 1.4 }, { x: 420.8, y: 427.2, size: 1.4 },
-  { x: 519.6, y: 213.3, size: 1.4 }, { x: 443.8, y: 406, size: 3 }, { x: 568.9, y: 288.9, size: 1.4 },
-  { x: 644, y: 326.1, size: 2 }, { x: 419.5, y: 233.4, size: 1.4 }, { x: 657.4, y: 378.9, size: 2 },
-  { x: 399, y: 312, size: 1.4 }, { x: 319.9, y: 332.6, size: 1.4 }, { x: 570.1, y: 347.5, size: 1.4 },
+const ORB_PARTICLES = [
+  { x: 287.4, y: 206.3, s: 2, o: 0.74, d: 4.54, dl: -1.43 }, { x: 280.4, y: 374.4, s: 2.56, o: 0.8, d: 4.37, dl: -0.8 }, { x: 347.9, y: 337.5, s: 2.77, o: 0.9, d: 3.21, dl: -1.29 },
+  { x: 386.8, y: 393.7, s: 2.08, o: 0.8, d: 3.6, dl: -2.16 }, { x: 426.2, y: 351.2, s: 2.06, o: 0.67, d: 4.79, dl: -3.88 }, { x: 303.5, y: 367.3, s: 2.5, o: 0.82, d: 4.5, dl: -1.17 },
+  { x: 311.2, y: 298.6, s: 2.45, o: 0.94, d: 3.85, dl: -0.88 }, { x: 381, y: 558.6, s: 1.07, o: 0.47, d: 2.54, dl: -1.59 }, { x: 262.9, y: 392, s: 2.26, o: 0.69, d: 2.92, dl: -2.8 },
+  { x: 288.5, y: 283.8, s: 2.7, o: 0.92, d: 4.52, dl: -0.38 }, { x: 369.1, y: 388.6, s: 2.34, o: 0.74, d: 4.56, dl: -1.78 }, { x: 189.5, y: 311.8, s: 2.24, o: 0.69, d: 4.52, dl: -1.52 },
+  { x: 339.9, y: 314.7, s: 2.56, o: 0.9, d: 4.8, dl: -0.18 }, { x: 460.8, y: 475.9, s: 1.25, o: 0.51, d: 3.64, dl: -2.22 }, { x: 482.7, y: 326.7, s: 1.96, o: 0.59, d: 3.82, dl: -1.12 },
+  { x: 336.5, y: 301.4, s: 2.82, o: 0.86, d: 3.05, dl: -4.28 }, { x: 321.7, y: 352.3, s: 2.64, o: 0.95, d: 4.76, dl: -3.54 }, { x: 322.5, y: 321.2, s: 2.93, o: 0.95, d: 4.38, dl: -3.74 },
+  { x: 319.4, y: 316.7, s: 2.9, o: 0.93, d: 4.75, dl: -2.83 }, { x: 242.9, y: 334.9, s: 2.35, o: 0.74, d: 3.61, dl: -3.31 }, { x: 276.9, y: 317.5, s: 2.78, o: 0.84, d: 4.13, dl: -3.15 },
+  { x: 314.2, y: 326.8, s: 2.77, o: 0.95, d: 4.84, dl: -1.15 }, { x: 292.6, y: 244, s: 2.21, o: 0.73, d: 4.26, dl: -0.03 }, { x: 297.2, y: 590.3, s: 0.77, o: 0.31, d: 4.72, dl: -0.07 },
+  { x: 331.7, y: 358.9, s: 2.58, o: 0.82, d: 2.94, dl: -0.2 }, { x: 473.2, y: 459.2, s: 1.35, o: 0.55, d: 3.89, dl: -3.53 }, { x: 363.2, y: 351.9, s: 2.61, o: 0.87, d: 4.48, dl: -0.16 },
+  { x: 332.7, y: 332.2, s: 2.56, o: 0.95, d: 4.61, dl: -3.17 }, { x: 363.2, y: 354.7, s: 2.47, o: 0.87, d: 3.54, dl: -0.01 }, { x: 297.6, y: 342.6, s: 2.54, o: 0.86, d: 4.65, dl: -0.68 },
+  { x: 291.9, y: 359.5, s: 2.5, o: 0.81, d: 3.73, dl: -4.12 }, { x: 378.1, y: 523.6, s: 1.29, o: 0.41, d: 3.9, dl: -0.01 }, { x: 283.9, y: 417.4, s: 2.07, o: 0.71, d: 3.79, dl: -1.17 },
+  { x: 95.6, y: 153.5, s: 1.26, o: 0.37, d: 3.8, dl: -3.77 }, { x: 319.2, y: 319.7, s: 2.75, o: 0.91, d: 4.11, dl: -3.92 }, { x: 361.5, y: 534.8, s: 1.52, o: 0.4, d: 2.67, dl: -0.09 },
+  { x: 314.1, y: 270.5, s: 2.63, o: 0.82, d: 4.58, dl: -0.86 }, { x: 610.5, y: 251.3, s: 1.06, o: 0.28, d: 2.5, dl: -4.12 }, { x: 363.7, y: 367.4, s: 2.2, o: 0.85, d: 4.33, dl: -4.52 },
+  { x: 317.3, y: 317.2, s: 2.77, o: 0.95, d: 4.13, dl: -0.01 }, { x: 190, y: 302.3, s: 2.07, o: 0.72, d: 2.93, dl: -0.55 }, { x: 320.2, y: 321.5, s: 2.62, o: 0.95, d: 3.31, dl: -1.53 },
+  { x: 338.6, y: 345.9, s: 2.69, o: 0.92, d: 3.81, dl: -1.95 }, { x: 345.1, y: 299.2, s: 2.82, o: 0.95, d: 4.85, dl: -2.64 }, { x: 334.6, y: 340.3, s: 2.53, o: 0.95, d: 4.24, dl: -3.42 },
+  { x: 413.2, y: 83.3, s: 1.26, o: 0.32, d: 3.85, dl: -1.61 }, { x: 550.2, y: 388.3, s: 1.25, o: 0.42, d: 4.51, dl: -3.3 }, { x: 363, y: 391.8, s: 2.54, o: 0.72, d: 3.46, dl: -1.68 },
+  { x: 349.2, y: 418.5, s: 2.16, o: 0.79, d: 4.43, dl: -2.66 }, { x: 507.4, y: 315.5, s: 1.81, o: 0.53, d: 3.46, dl: -1.46 }, { x: 269.6, y: 290.5, s: 2.61, o: 0.87, d: 4.2, dl: -2.18 },
+  { x: 320.2, y: 319.5, s: 2.72, o: 0.92, d: 3.38, dl: -4.2 }, { x: 254.2, y: 332, s: 2.24, o: 0.81, d: 2.65, dl: -1.87 }, { x: 502.9, y: 129.4, s: 1.18, o: 0.43, d: 2.57, dl: -3.81 },
+  { x: 343.2, y: 292.3, s: 2.65, o: 0.86, d: 3.15, dl: -2.8 }, { x: 336.7, y: 331.2, s: 2.94, o: 0.95, d: 3.74, dl: -2.26 }, { x: 216.5, y: 343.3, s: 2.23, o: 0.71, d: 4.89, dl: -0.98 },
+  { x: 320, y: 321.9, s: 2.95, o: 0.95, d: 3.73, dl: -2.56 }, { x: 247.4, y: 196.4, s: 1.97, o: 0.67, d: 3.25, dl: -0.9 }, { x: 322.7, y: 367.3, s: 2.74, o: 0.83, d: 3.09, dl: -4.69 },
+  { x: 320.1, y: 321.4, s: 2.84, o: 0.91, d: 3.04, dl: -1.74 }, { x: 319.2, y: 320.9, s: 2.76, o: 0.95, d: 4.12, dl: -2.2 }, { x: 454.6, y: 165.3, s: 1.61, o: 0.46, d: 3.36, dl: -0.43 },
+  { x: 71.7, y: 345.5, s: 1.33, o: 0.43, d: 4.04, dl: -4.1 }, { x: 314.4, y: 343, s: 2.87, o: 0.87, d: 3.63, dl: -3.81 }, { x: 314.4, y: 314.5, s: 2.76, o: 0.89, d: 4.08, dl: -1.13 },
+  { x: 317.3, y: 314.7, s: 2.76, o: 0.92, d: 4.99, dl: -4.96 }, { x: 363.9, y: 187.9, s: 2.03, o: 0.59, d: 4.88, dl: -0.31 }, { x: 320.5, y: 320.1, s: 3.03, o: 0.95, d: 3.67, dl: -1.86 },
+  { x: 121.8, y: 395.3, s: 1.64, o: 0.5, d: 4.06, dl: -4.64 }, { x: 63, y: 254.2, s: 0.94, o: 0.38, d: 4.04, dl: -4.23 }, { x: 315.5, y: 304.4, s: 2.97, o: 0.92, d: 4.83, dl: -1.12 },
+  { x: 318.2, y: 322.7, s: 2.89, o: 0.94, d: 4.84, dl: -4.32 }, { x: 404.2, y: 262, s: 2.19, o: 0.8, d: 3.87, dl: -1.92 }, { x: 170.7, y: 165.9, s: 1.19, o: 0.51, d: 3.39, dl: -3.41 },
+  { x: 342.1, y: 290.7, s: 2.78, o: 0.88, d: 2.99, dl: -2.17 }, { x: 488.3, y: 489, s: 1.2, o: 0.37, d: 4.18, dl: -3.9 }, { x: 327.2, y: 427.1, s: 2.3, o: 0.74, d: 2.68, dl: -1.09 },
+  { x: 310.2, y: 311.1, s: 2.87, o: 0.95, d: 2.68, dl: -3.07 }, { x: 322.2, y: 322.5, s: 2.64, o: 0.91, d: 3.71, dl: -3.91 }, { x: 418.9, y: 98.1, s: 1.36, o: 0.41, d: 3.99, dl: -1.88 },
+  { x: 214.2, y: 346, s: 1.97, o: 0.67, d: 4.43, dl: -4.81 }, { x: 376.4, y: 345.6, s: 2.32, o: 0.86, d: 4.29, dl: -3.78 }, { x: 375.3, y: 186, s: 2, o: 0.56, d: 4.27, dl: -1.1 },
+  { x: 262, y: 370.3, s: 2.29, o: 0.81, d: 2.78, dl: -1.13 }, { x: 456.5, y: 353.5, s: 1.76, o: 0.61, d: 4.51, dl: -2.97 }, { x: 392.3, y: 505.1, s: 1.7, o: 0.45, d: 3.86, dl: -2.68 },
+  { x: 227.1, y: 461.9, s: 1.73, o: 0.56, d: 2.91, dl: -3.23 }, { x: 327.2, y: 276.2, s: 2.69, o: 0.86, d: 2.7, dl: -1.87 }, { x: 135.2, y: 381.9, s: 1.52, o: 0.6, d: 3.35, dl: -4.41 },
+  { x: 334.8, y: 402.1, s: 2.44, o: 0.8, d: 4.2, dl: -0.31 }, { x: 317.8, y: 318.1, s: 3.03, o: 0.95, d: 4.73, dl: -4.88 }, { x: 466.5, y: 316.4, s: 1.75, o: 0.66, d: 3.27, dl: -1.31 },
+  { x: 396.8, y: 182.6, s: 1.94, o: 0.54, d: 4.87, dl: -3 }, { x: 368, y: 281.5, s: 2.39, o: 0.8, d: 4.43, dl: -0.63 }, { x: 278.7, y: 146.4, s: 1.51, o: 0.52, d: 3.98, dl: -0.67 },
+  { x: 411.1, y: 332.8, s: 2.45, o: 0.77, d: 3.01, dl: -0.72 }, { x: 402.2, y: 308.9, s: 2.27, o: 0.77, d: 4.27, dl: -4.65 }, { x: 348.3, y: 373.6, s: 2.59, o: 0.79, d: 3.38, dl: -1.2 },
+  { x: 497.3, y: 364.7, s: 1.93, o: 0.61, d: 4.59, dl: -0.97 }, { x: 480.6, y: 547.4, s: 1.09, o: 0.34, d: 3.7, dl: -0.91 }, { x: 111.1, y: 432.1, s: 1.34, o: 0.5, d: 4.84, dl: -1.42 },
+  { x: 330.3, y: 332, s: 2.73, o: 0.95, d: 2.86, dl: -2.83 }, { x: 226.6, y: 353.1, s: 2.42, o: 0.71, d: 4.42, dl: -2.4 }, { x: 362.4, y: 66.9, s: 1.27, o: 0.4, d: 4.56, dl: -4.55 },
+  { x: 384.5, y: 292, s: 2.37, o: 0.87, d: 2.64, dl: -4.99 }, { x: 87.3, y: 191.1, s: 1.09, o: 0.39, d: 3.25, dl: -1.38 }, { x: 292.9, y: 336.7, s: 2.73, o: 0.83, d: 3.26, dl: -0.08 },
+  { x: 377, y: 327.7, s: 2.47, o: 0.85, d: 2.95, dl: -4.42 }, { x: 326.2, y: 319.7, s: 2.85, o: 0.95, d: 3.88, dl: -3.62 }, { x: 323.9, y: 381.8, s: 2.57, o: 0.8, d: 4.48, dl: -1.27 },
+  { x: 308, y: 306, s: 2.87, o: 0.95, d: 4.5, dl: -0.88 }, { x: 592.3, y: 247.1, s: 0.9, o: 0.41, d: 3.33, dl: -1.28 }, { x: 420.6, y: 376.8, s: 2, o: 0.77, d: 4.06, dl: -4.73 },
+  { x: 561, y: 209.9, s: 0.97, o: 0.35, d: 4.73, dl: -4.7 }, { x: 317.2, y: 328.6, s: 2.58, o: 0.95, d: 3.36, dl: -4.04 }, { x: 346, y: 344.5, s: 2.82, o: 0.94, d: 4.65, dl: -4.72 },
+  { x: 298.5, y: 290.2, s: 2.55, o: 0.95, d: 3.62, dl: -3.9 }, { x: 521.7, y: 409.5, s: 1.49, o: 0.43, d: 2.46, dl: -0.42 }, { x: 319.1, y: 316.9, s: 2.97, o: 0.95, d: 4.12, dl: -1.23 },
+  { x: 108.5, y: 285.1, s: 1.47, o: 0.58, d: 4.63, dl: -3.02 }, { x: 311.4, y: 331.7, s: 2.82, o: 0.95, d: 3.67, dl: -2.7 }, { x: 334.4, y: 192.8, s: 2.16, o: 0.63, d: 2.67, dl: -0.24 },
+  { x: 344.2, y: 226.2, s: 2.32, o: 0.75, d: 2.58, dl: -0.52 }, { x: 236.1, y: 499.6, s: 1.41, o: 0.49, d: 2.47, dl: -0.38 }, { x: 442, y: 359, s: 2.17, o: 0.72, d: 3.21, dl: -4 },
+  { x: 512.5, y: 358.2, s: 1.35, o: 0.48, d: 4.54, dl: -3.43 }, { x: 383.8, y: 221.3, s: 2.23, o: 0.76, d: 2.94, dl: -0.15 }, { x: 317.8, y: 321.7, s: 2.72, o: 0.95, d: 3.53, dl: -2.32 },
+  { x: 304.2, y: 287, s: 2.63, o: 0.9, d: 2.95, dl: -1.22 }, { x: 452.9, y: 282.2, s: 1.88, o: 0.64, d: 2.65, dl: -4.16 }, { x: 330.9, y: 311.5, s: 2.87, o: 0.95, d: 3.17, dl: -1.94 },
+  { x: 245.6, y: 397.3, s: 2.09, o: 0.72, d: 4.9, dl: -2.36 }, { x: 109.3, y: 271.9, s: 1.5, o: 0.56, d: 2.6, dl: -1.68 }, { x: 161.6, y: 323.5, s: 1.75, o: 0.59, d: 4.23, dl: -2.16 },
+  { x: 309.7, y: 127, s: 1.37, o: 0.58, d: 4.81, dl: -1.41 }, { x: 312.9, y: 296.1, s: 2.83, o: 0.92, d: 4.79, dl: -4.23 }, { x: 499.6, y: 256.4, s: 1.71, o: 0.5, d: 3.14, dl: -4.87 },
+  { x: 313, y: 299.9, s: 2.7, o: 0.95, d: 3.17, dl: -0.59 }, { x: 597.1, y: 245.1, s: 1.07, o: 0.29, d: 3.77, dl: -2.28 }, { x: 328.2, y: 389.3, s: 2.51, o: 0.81, d: 4.33, dl: -0.25 },
+  { x: 352.7, y: 206.1, s: 2.22, o: 0.74, d: 4.93, dl: -1.4 }, { x: 310.2, y: 305.8, s: 2.86, o: 0.92, d: 4.56, dl: -1.52 }, { x: 374.3, y: 273.7, s: 2.54, o: 0.78, d: 4.28, dl: -0.77 },
+  { x: 316, y: 322.6, s: 2.59, o: 0.95, d: 3.2, dl: -4.05 }, { x: 349.7, y: 540.2, s: 1.44, o: 0.49, d: 2.82, dl: -1.9 }, { x: 520.5, y: 314.3, s: 1.36, o: 0.6, d: 4.5, dl: -2.95 },
+  { x: 323.8, y: 387.8, s: 2.16, o: 0.88, d: 4.71, dl: -0.81 }, { x: 384.8, y: 303.8, s: 2.21, o: 0.87, d: 4.97, dl: -4.41 }, { x: 273.4, y: 175.9, s: 1.59, o: 0.56, d: 2.55, dl: -0.9 },
+  { x: 319.9, y: 309.3, s: 2.7, o: 0.95, d: 4.87, dl: -3.06 }, { x: 345.1, y: 337.3, s: 2.54, o: 0.87, d: 4.51, dl: -0.32 }, { x: 322.5, y: 299.4, s: 2.8, o: 0.91, d: 3.05, dl: -2.94 },
+  { x: 520.5, y: 509.5, s: 1.06, o: 0.34, d: 3.64, dl: -3.18 }, { x: 444.4, y: 417.2, s: 1.77, o: 0.61, d: 2.99, dl: -0.52 }, { x: 311.7, y: 341.5, s: 2.61, o: 0.94, d: 3.76, dl: -2.41 },
+  { x: 311.3, y: 294.7, s: 2.42, o: 0.93, d: 4.54, dl: -3.33 }, { x: 343.3, y: 587.4, s: 1.25, o: 0.3, d: 4.93, dl: -0.24 }, { x: 287.2, y: 557, s: 1.15, o: 0.44, d: 3.11, dl: -1.02 },
+  { x: 576, y: 262.7, s: 1.06, o: 0.43, d: 4.24, dl: -4.85 }, { x: 318.3, y: 472.7, s: 1.72, o: 0.67, d: 3.81, dl: -1.98 }, { x: 324.3, y: 318, s: 2.72, o: 0.95, d: 3.04, dl: -2.94 },
+  { x: 525.1, y: 388.6, s: 1.56, o: 0.51, d: 4.21, dl: -0.06 }, { x: 339.6, y: 301.9, s: 2.69, o: 0.9, d: 3.06, dl: -1.75 }, { x: 238.3, y: 479.5, s: 1.72, o: 0.6, d: 2.78, dl: -3.87 },
+  { x: 343, y: 332.2, s: 2.62, o: 0.89, d: 4.5, dl: -2.22 }, { x: 324.3, y: 303, s: 2.55, o: 0.95, d: 2.92, dl: -1.88 }, { x: 438.2, y: 302.3, s: 2.16, o: 0.76, d: 3.54, dl: -0.54 },
+  { x: 305, y: 309.2, s: 2.85, o: 0.95, d: 3.77, dl: -2.18 }, { x: 322.3, y: 290.4, s: 2.7, o: 0.95, d: 3.68, dl: -2.53 },
 ] as const
-
-// prettier-ignore
-const BRAIN_EDGES: [number, number][] = [
-  [0, 65], [0, 42], [1, 40], [1, 67], [2, 13], [2, 52], [3, 54], [3, 15], [4, 29], [4, 69], [5, 15], [5, 3],
-  [6, 19], [6, 22], [7, 67], [7, 52], [8, 53], [8, 60], [9, 38], [9, 70], [9, 23], [10, 23], [10, 13], [11, 27],
-  [11, 48], [12, 64], [12, 41], [13, 52], [14, 60], [14, 53], [14, 8], [15, 54], [16, 33], [16, 32], [17, 25],
-  [17, 28], [18, 47], [18, 46], [19, 22], [20, 51], [20, 46], [21, 36], [21, 48], [22, 31], [22, 42], [23, 38],
-  [24, 56], [24, 70], [24, 38], [25, 59], [26, 71], [26, 14], [27, 48], [28, 30], [28, 59], [29, 69], [30, 40],
-  [31, 42], [31, 39], [32, 33], [32, 61], [34, 66], [34, 0], [35, 53], [35, 8], [36, 48], [37, 62], [37, 50],
-  [38, 70], [39, 42], [39, 55], [40, 28], [41, 43], [41, 64], [43, 62], [43, 64], [44, 58], [44, 25], [45, 49],
-  [45, 65], [46, 30], [46, 1], [47, 44], [49, 65], [50, 57], [50, 62], [50, 43], [51, 54], [54, 5], [55, 25],
-  [56, 70], [57, 62], [58, 55], [58, 25], [59, 17], [61, 63], [61, 33], [62, 41], [63, 17], [66, 0], [68, 66],
-  [68, 34], [68, 71], [69, 2], [70, 23], [71, 65], [71, 49],
-]
 
 export function AmbientTexture() {
   return (
@@ -64,28 +78,25 @@ export function AmbientTexture() {
       {/* Base vignette: cool navy corners framing the canvas */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_140%_90%_at_50%_-20%,rgba(20,26,38,0.9),transparent_65%),radial-gradient(ellipse_100%_70%_at_50%_115%,rgba(0,0,0,0.55),transparent_60%)]" />
 
-      {/* The glow: a large soft amber light source, blurred to a haze —
-          the visual anchor the REDSUN/BioForge-style references use to
-          keep a dark page from reading as flat or empty. */}
+      {/* The glow: a soft amber light source behind the orb, blurred to a
+          haze — the visual anchor that keeps a dark page from reading as
+          flat or empty. */}
       <div
-        className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 rounded-full opacity-[0.35] blur-[110px]"
+        className="absolute left-1/2 top-[-14%] h-[520px] w-[520px] -translate-x-1/2 rounded-full opacity-[0.38] blur-[110px]"
         style={{
-          background:
-            "radial-gradient(ellipse 60% 55% at 50% 50%, #ff8a3d, #e0561a 45%, transparent 75%)",
+          background: "radial-gradient(circle at 50% 50%, #ff8a3d, #e0561a 45%, transparent 75%)",
         }}
       />
       <div
-        className="absolute left-1/2 top-[-6%] h-[220px] w-[420px] -translate-x-1/2 rounded-full opacity-[0.4] blur-[60px]"
+        className="absolute left-1/2 top-[-6%] h-[200px] w-[200px] -translate-x-1/2 rounded-full opacity-[0.45] blur-[55px]"
         style={{
-          background: "radial-gradient(ellipse 60% 55% at 50% 50%, #ffb066, transparent 70%)",
+          background: "radial-gradient(circle at 50% 50%, #ffb066, transparent 70%)",
         }}
       />
 
-      {/* Thin ring arcs echoing the "eclipse" outline from the reference —
-          geometry standing in for the halo a real light source would cast,
-          not a decorative sticker. */}
-      <div className="absolute left-1/2 top-[-2%] h-[640px] w-[640px] -translate-x-1/2 rounded-full border border-[#ff8a3d]/[0.12]" />
-      <div className="absolute left-1/2 top-[6%] h-[420px] w-[420px] -translate-x-1/2 rounded-full border border-[#ffb066]/[0.1]" />
+      {/* Faint orbit boundary — geometry standing in for the halo the orb's
+          own light would cast, not a decorative sticker. */}
+      <div className="absolute left-1/2 top-[-10%] h-[600px] w-[600px] -translate-x-1/2 rounded-full border border-[#ff8a3d]/[0.1]" />
 
       {/* Faint dot-grid — a data/instrument-panel cue used at very low
           opacity so it reads as texture, not pattern. */}
@@ -99,43 +110,29 @@ export function AmbientTexture() {
         }}
       />
 
-      {/* The brain-suggestive particle network — same bounding box as the
-          glow above it (w-[900px] h-[560px], same position), so it reads
-          as "what the light is coming from" rather than a separate layer.
-          Edges first (so node dots sit visually on top of their own
-          connections), each with a staggered dash-travel delay so the
-          mesh fires asynchronously instead of in lockstep. */}
+      {/* The particle orb: hundreds of amber points, densest at the core
+          and thinning outward, each twinkling on its own cycle while the
+          whole cluster turns slowly — a glowing sphere of light rather
+          than a static ring. */}
       <svg
-        className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 overflow-visible"
-        viewBox="0 0 900 560"
+        className="absolute left-1/2 top-[-10%] h-[600px] w-[600px] -translate-x-1/2 overflow-visible"
+        viewBox="0 0 640 640"
         aria-hidden="true"
       >
-        {BRAIN_EDGES.map(([a, b], i) => (
-          <line
-            key={i}
-            className="ambient-thread"
-            x1={BRAIN_NODES[a].x}
-            y1={BRAIN_NODES[a].y}
-            x2={BRAIN_NODES[b].x}
-            y2={BRAIN_NODES[b].y}
-            stroke="#ffb066"
-            strokeWidth="1"
-            strokeOpacity="0.22"
-            style={{ animationDelay: `${((i % 9) * -0.6).toFixed(2)}s` }}
-          />
-        ))}
-        {BRAIN_NODES.map((d, i) => (
-          <circle
-            key={i}
-            className="ambient-node"
-            cx={d.x}
-            cy={d.y}
-            r={d.size}
-            fill="#ffb066"
-            opacity={d.size >= 3 ? 0.65 : 0.4}
-            style={{ animationDelay: `${((i % 11) * -0.4).toFixed(2)}s` }}
-          />
-        ))}
+        <g className="ambient-orb-group">
+          {ORB_PARTICLES.map((p, i) => (
+            <circle
+              key={i}
+              className="ambient-orb-particle"
+              cx={p.x}
+              cy={p.y}
+              r={p.s}
+              fill="#ffb066"
+              opacity={p.o}
+              style={{ animationDuration: `${p.d}s`, animationDelay: `${p.dl}s` }}
+            />
+          ))}
+        </g>
       </svg>
 
       <div
