@@ -371,9 +371,14 @@ export default function CoursePage() {
             <button
               type="button"
               onClick={() => setShowManageDialog(true)}
-              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
             >
-              <span className="flex items-center gap-3">
+              <span className="tech-scan" />
+              <span className="tech-corner tech-corner-tl" />
+              <span className="tech-corner tech-corner-tr" />
+              <span className="tech-corner tech-corner-bl" />
+              <span className="tech-corner tech-corner-br" />
+              <span className="relative flex items-center gap-3">
                 <FolderOpen size={18} className="text-[#ffb066]" />
                 <span className="flex flex-col items-start text-right">
                   <span className="text-white">חומרי הקורס</span>
@@ -388,29 +393,39 @@ export default function CoursePage() {
                   </span>
                 </span>
               </span>
-              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
             </button>
 
             <Link
               href={`/dashboard/${courseCode}/quiz`}
-              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
             >
-              <span className="flex items-center gap-3">
+              <span className="tech-scan" />
+              <span className="tech-corner tech-corner-tl" />
+              <span className="tech-corner tech-corner-tr" />
+              <span className="tech-corner tech-corner-bl" />
+              <span className="tech-corner tech-corner-br" />
+              <span className="relative flex items-center gap-3">
                 <GraduationCap size={18} className="text-[#ffb066]" />
                 <span className="text-white">התחל מבחן תרגול</span>
               </span>
-              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
             </Link>
 
             <Link
               href={`/dashboard/${courseCode}/progress`}
-              className="w-full flex items-center justify-between gap-3 p-4 glass-panel border border-[#242b3a] rounded-sm text-sm transition-all duration-300 hover:border-[#ff7a3d]/60"
+              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
             >
-              <span className="flex items-center gap-3">
+              <span className="tech-scan" />
+              <span className="tech-corner tech-corner-tl" />
+              <span className="tech-corner tech-corner-tr" />
+              <span className="tech-corner tech-corner-bl" />
+              <span className="tech-corner tech-corner-br" />
+              <span className="relative flex items-center gap-3">
                 <TrendingUp size={18} className="text-[#ffb066]" />
                 <span className="text-white">התקדמות בקורס</span>
               </span>
-              <ArrowLeft size={14} className="text-[#ffb066] shrink-0" />
+              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
             </Link>
           </div>
         </div>
