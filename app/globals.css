@@ -179,26 +179,34 @@
     animation: tutor-pulse 2.5s ease-in-out infinite;
   }
 
-  /* Ambient background's particle orb — each point twinkles on its own
-     cycle (duration/delay set per-particle inline, see
-     ambient-texture.tsx) while the whole cluster turns slowly, reading as
-     a glowing sphere of light rather than a static ring. transform-box:
-     fill-box/center scales each circle from its own middle, not the SVG
-     canvas's (0,0) — the CSS default for SVG shapes, which would
-     otherwise make every particle drift as it "twinkles" instead of
-     pulsing in place. */
-  .ambient-orb-particle {
+  /* Ambient background's brain-shaped neural network — each node pulses
+     on its own cycle (duration/delay set per-node inline, see
+     ambient-texture.tsx), each edge plays a travelling "signal" via
+     animated stroke-dashoffset, and the outline breathes slowly, reading
+     as a real (if faint) brain rather than a static sphere of dust.
+     transform-box: fill-box/center scales each circle from its own
+     middle, not the SVG canvas's (0,0) — the CSS default for SVG shapes,
+     which would otherwise make every node drift as it pulses instead of
+     staying in place. */
+  .ambient-brain-node {
     transform-box: fill-box;
     transform-origin: center;
-    animation-name: orb-twinkle;
+    animation-name: brain-node-pulse;
     animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
   }
 
-  .ambient-orb-group {
+  .ambient-brain-edge {
+    animation-name: brain-signal;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .ambient-brain-outline {
     transform-box: view-box;
     transform-origin: 50% 50%;
-    animation: orb-spin 150s linear infinite;
+    opacity: 0.16;
+    animation: brain-breathe 7s ease-in-out infinite;
   }
 
   /* A new item arriving in a live list (a chat bubble) — functional
@@ -275,13 +283,18 @@
   50% { transform: scale(1.18); opacity: 0.9; }
 }
 
-@keyframes orb-twinkle {
+@keyframes brain-node-pulse {
   0%, 100% { opacity: 0.25; transform: scale(0.85); }
   50% { opacity: 1; transform: scale(1.25); }
 }
 
-@keyframes orb-spin {
-  to { transform: rotate(360deg); }
+@keyframes brain-signal {
+  to { stroke-dashoffset: -160; }
+}
+
+@keyframes brain-breathe {
+  0%, 100% { opacity: 0.12; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.015); }
 }
 
 @media (prefers-reduced-motion: reduce), (scripting: none) {
@@ -290,8 +303,9 @@
     transform: none !important;
   }
   .tutor-avatar-ring,
-  .ambient-orb-particle,
-  .ambient-orb-group {
+  .ambient-brain-node,
+  .ambient-brain-edge,
+  .ambient-brain-outline {
     animation: none !important;
   }
 }
