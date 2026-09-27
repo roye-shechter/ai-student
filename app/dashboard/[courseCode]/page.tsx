@@ -433,7 +433,7 @@ export default function CoursePage() {
                   <div className={`p-2 rounded-full flex h-8 w-8 items-center justify-center shrink-0 ${msg.role === "user" ? "bg-[#ff7a3d] text-[#12161f]" : "bg-[#161b26] text-[#ffb066]"}`}>
                     {msg.role === "user" ? <User size={16} /> : <TutorAvatar size={16} />}
                   </div>
-                  <div className={`p-3 rounded-full text-sm leading-relaxed ${msg.role === "user" ? "bg-[#ff7a3d] text-[#12161f] text-left" : "bg-[#161b26] text-neutral-100"}`}>
+                  <div className={`p-3 text-sm leading-relaxed break-words ${msg.role === "user" ? "rounded-xl rounded-tl-none bg-[#ff7a3d] text-[#12161f] text-left" : "rounded-xl rounded-tr-none bg-[#161b26] text-neutral-100"}`}>
                     {msg.role === "user" ? (
                       msg.text
                     ) : (

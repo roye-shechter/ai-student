@@ -139,9 +139,28 @@ export function AmbientTexture() {
         viewBox="0 0 900 560"
         aria-hidden="true"
       >
-        <g className="ambient-brain-outline" fill="none" stroke="#ffb066" strokeWidth={1}>
-          <ellipse cx={358} cy={250} rx={232} ry={196} />
-          <ellipse cx={542} cy={250} rx={232} ry={196} />
+        <g className="ambient-brain-outline" fill="none" stroke="#ffb066" strokeWidth={1.1}>
+          {/* Two lobed hemispheres (frontal/parietal/temporal/occipital
+              bumps, not a plain oval) sharing the flat midline fissure,
+              mirrored across x=450 — reads as a top-down brain silhouette
+              instead of two overlapping circles. */}
+          <path
+            transform="translate(450 250)"
+            d="M -14,-180 C -60,-196 -112,-192 -152,-166 C -188,-144 -204,-108 -207,-68
+               C -210,-24 -198,18 -172,54 C -148,88 -158,112 -193,142
+               C -213,168 -192,187 -157,192 C -118,197 -78,187 -46,176
+               C -26,169 -18,155 -14,140 Z"
+          />
+          <path
+            transform="translate(450 250) scale(-1 1)"
+            d="M -14,-180 C -60,-196 -112,-192 -152,-166 C -188,-144 -204,-108 -207,-68
+               C -210,-24 -198,18 -172,54 C -148,88 -158,112 -193,142
+               C -213,168 -192,187 -157,192 C -118,197 -78,187 -46,176
+               C -26,169 -18,155 -14,140 Z"
+          />
+          {/* Brainstem: a short tapering trapezoid trailing down from the
+              gap between the hemispheres. */}
+          <path d="M 410,420 L 490,420 L 466,512 L 434,512 Z" />
         </g>
 
         <g stroke="#ffb066" strokeLinecap="round">

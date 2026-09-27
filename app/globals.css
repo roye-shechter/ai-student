@@ -205,7 +205,7 @@
   .ambient-brain-outline {
     transform-box: view-box;
     transform-origin: 50% 50%;
-    opacity: 0.16;
+    opacity: 0.3;
     animation: brain-breathe 7s ease-in-out infinite;
   }
 
@@ -293,8 +293,8 @@
 }
 
 @keyframes brain-breathe {
-  0%, 100% { opacity: 0.12; transform: scale(1); }
-  50% { opacity: 0.2; transform: scale(1.015); }
+  0%, 100% { opacity: 0.24; transform: scale(1); }
+  50% { opacity: 0.38; transform: scale(1.015); }
 }
 
 @media (prefers-reduced-motion: reduce), (scripting: none) {
