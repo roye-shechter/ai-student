@@ -91,6 +91,7 @@ model User {
   createdCourses Course[]      @relation("CreatedCourses")
   usageCounters UsageCounter[]
   activityEvents ActivityEvent[]
+  modelUsageEvents ModelUsageEvent[]
 
   @@index([email])
   @@index([username])
@@ -275,6 +276,36 @@ model ActivityEvent {
   @@index([createdAt])
   @@index([type])
   @@map("activity_events")
+}
+
+// One row per LLM call made on a student's behalf (tutor answer, verifier
+// review, quiz generation/grading). Feeds the per-model cost analytics in the
+// admin dashboard. Token counts are always recorded; costUsd is derived from
+// lib/llm/pricing.ts and is null only for a model with no configured price.
+model ModelUsageEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  courseId        String?
+  provider        String // "anthropic" | "gemini" | "groq"
+  model           String
+  route           String // "standard" | "hard" | "visual" | "quick" | "verify" | "quiz"
+  feature         String // "chat" | "verify" | "quiz_generate" | "quiz_grade"
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  cacheReadTokens Int      @default(0)
+  cacheWriteTokens Int     @default(0)
+  costUsd         Float?
+  latencyMs       Int
+  ok              Boolean
+  fallbackFrom    String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([model])
+  @@index([createdAt])
+  @@map("model_usage_events")
 }
 
 // =====================================================

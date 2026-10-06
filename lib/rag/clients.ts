@@ -1,5 +1,6 @@
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
+import { GoogleGenAI } from "@google/genai"
 import { toSql } from "pgvector"
 
 /**
@@ -65,6 +66,32 @@ export function getAnthropic(): Anthropic {
   }
   return _anthropic
 }
+
+let _gemini: GoogleGenAI | null = null
+export function getGemini(): GoogleGenAI {
+  if (!_gemini) {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not set")
+    _gemini = new GoogleGenAI({ apiKey })
+  }
+  return _gemini
+}
+
+/** Groq serves open-weight models through an OpenAI-compatible endpoint. */
+let _groq: OpenAI | null = null
+export function getGroq(): OpenAI {
+  if (!_groq) {
+    const apiKey = process.env.GROQ_API_KEY
+    if (!apiKey) throw new Error("GROQ_API_KEY is not set")
+    _groq = new OpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" })
+  }
+  return _groq
+}
+
+export const GEMINI_VISUAL_MODEL = "gemini-3.8-flash"
+export const GEMINI_VISUAL_FALLBACK_MODEL = "gemini-3.6-flash"
+export const GEMINI_VERIFIER_MODEL = "gemini-3.1-flash-lite"
+export const GROQ_QUICK_MODEL = "openai/gpt-oss-120b"
 
 /**
  * Format a raw embedding array as a Postgres `vector` literal for use in a

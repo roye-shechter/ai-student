@@ -1,7 +1,10 @@
 import { z } from "zod"
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod"
 import { assertEmbeddingEnv, assertLlmEnv, CHAT_MODEL, getAnthropic, HARD_CHAT_MODEL } from "./clients"
-import { classifyComplexity, retrieveContext, type RetrievedChunk } from "./chat"
+import { retrieveContext, type RetrievedChunk } from "./chat"
+import { classifyComplexity } from "@/lib/llm/route"
+import { fromAnthropicUsage } from "@/lib/llm/pricing"
+import { logModelUsage } from "@/lib/llm/usage"
 
 /**
  * Quiz generation + grading, built on top of the same retrieval (pgvector,
@@ -74,11 +77,23 @@ export async function generateQuiz(args: {
   })
 
   const anthropic = getAnthropic()
+  const started = Date.now()
   const message = await anthropic.messages.parse({
     model: CHAT_MODEL,
     max_tokens: GENERATION_MAX_TOKENS,
     messages: [{ role: "user", content: buildGenerationPrompt(chunks, courseName) }],
     output_config: { format: zodOutputFormat(QuizGenerationSchema) },
+  })
+  await logModelUsage({
+    userId,
+    courseId,
+    provider: "anthropic",
+    model: CHAT_MODEL,
+    route: "quiz",
+    feature: "quiz_generate",
+    usage: fromAnthropicUsage(message.usage),
+    latencyMs: Date.now() - started,
+    ok: message.parsed_output !== null,
   })
 
   if (!message.parsed_output) {
@@ -129,16 +144,19 @@ function buildGradingPrompt(questions: ShortAnswerToGrade[]): string {
  * numeric answer is verified rather than eyeballed.
  */
 export async function gradeShortAnswers(
-  questions: ShortAnswerToGrade[]
+  questions: ShortAnswerToGrade[],
+  ctx: { userId: string; courseId: string }
 ): Promise<GradedAnswer[]> {
   if (questions.length === 0) return []
   assertLlmEnv()
 
   const isHard = questions.some((q) => classifyComplexity(q.questionText) === "hard")
   const anthropic = getAnthropic()
+  const model = isHard ? HARD_CHAT_MODEL : CHAT_MODEL
+  const started = Date.now()
 
   const message = await anthropic.messages.parse({
-    model: isHard ? HARD_CHAT_MODEL : CHAT_MODEL,
+    model,
     max_tokens: isHard ? GRADING_MAX_TOKENS_HARD : GRADING_MAX_TOKENS_SIMPLE,
     messages: [{ role: "user", content: buildGradingPrompt(questions) }],
     output_config: {
@@ -151,6 +169,17 @@ export async function gradeShortAnswers(
           tools: [{ type: "code_execution_20260521" as const, name: "code_execution" as const }],
         }
       : {}),
+  })
+  await logModelUsage({
+    userId: ctx.userId,
+    courseId: ctx.courseId,
+    provider: "anthropic",
+    model,
+    route: "quiz",
+    feature: "quiz_grade",
+    usage: fromAnthropicUsage(message.usage),
+    latencyMs: Date.now() - started,
+    ok: message.parsed_output !== null,
   })
 
   if (!message.parsed_output) {

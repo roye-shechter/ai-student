@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
+import { AdminModelUsage } from "@/components/admin-model-usage"
 
 type AdminIdentity = { id: string; name: string }
 
@@ -289,6 +290,8 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        <AdminModelUsage />
 
         <Card className="glass-panel border-[#242b3a] text-white">
           <CardHeader>

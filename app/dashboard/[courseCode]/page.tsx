@@ -15,8 +15,10 @@ import { ManageMaterialsDialog } from "@/components/manage-materials-dialog"
 import { ExamDatesCard, type ExamDateEntry } from "@/components/exam-dates-card"
 import { TutorAvatar } from "@/components/tutor-avatar"
 import { gsap, useGSAP } from "@/lib/gsap"
+import { prepareChatImage, type ChatImage } from "@/lib/chat-image"
 import {
   FolderOpen, ArrowRight, ArrowLeft, Send, User, AlertCircle, Square, RotateCcw, GraduationCap, TrendingUp,
+  ImagePlus, X,
 } from "lucide-react"
 
 type CourseInfo = {
@@ -35,7 +37,7 @@ type CourseDocument = {
   createdAt: string
 }
 
-type ChatMessage = { role: string; text: string; chunks?: SourceChunk[] }
+type ChatMessage = { role: string; text: string; chunks?: SourceChunk[]; imagePreview?: string }
 
 type ChatStreamEvent =
   | { type: "sources"; chunks: SourceChunk[]; sessionId: string }
@@ -82,9 +84,11 @@ export default function CoursePage() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [streamStarted, setStreamStarted] = useState(false)
-  const [chatError, setChatError] = useState<{ message: string; retryText: string } | null>(null)
+  const [chatError, setChatError] = useState<{ message: string; retryText: string; image?: ChatImage } | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const [pendingImage, setPendingImage] = useState<ChatImage | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -220,10 +224,10 @@ export default function CoursePage() {
   }
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, image?: ChatImage) => {
       if (!text.trim() || isLoading) return
       setChatError(null)
-      setMessages((prev) => [...prev, { role: "user", text }])
+      setMessages((prev) => [...prev, { role: "user", text, imagePreview: image?.previewUrl }])
       setIsLoading(true)
       setStreamStarted(false)
 
@@ -240,7 +244,12 @@ export default function CoursePage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ message: text, courseCode, sessionId }),
+          body: JSON.stringify({
+            message: text,
+            courseCode,
+            sessionId,
+            image: image ? { mimeType: image.mimeType, base64: image.base64 } : undefined,
+          }),
         })
 
         if (!response.ok || !response.body) {
@@ -297,7 +306,7 @@ export default function CoursePage() {
               return last?.role === "assistant" && last.text === "" ? prev.slice(0, -1) : prev
             })
           }
-          setChatError({ message, retryText: text })
+          setChatError({ message, retryText: text, image })
         }
       } finally {
         setIsLoading(false)
@@ -311,8 +320,21 @@ export default function CoursePage() {
   const handleSendMessage = () => {
     if (!input.trim() || isLoading) return
     const text = input
+    const image = pendingImage ?? undefined
     setInput("")
-    sendMessage(text)
+    setPendingImage(null)
+    sendMessage(text, image)
+  }
+
+  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    try {
+      setPendingImage(await prepareChatImage(file))
+    } catch (error) {
+      setChatError({ message: error instanceof Error ? error.message : "לא ניתן לעבד את התמונה", retryText: "" })
+    }
   }
 
   const handleStop = () => {
@@ -320,10 +342,10 @@ export default function CoursePage() {
   }
 
   const handleRetry = () => {
-    if (!chatError) return
-    const { retryText } = chatError
+    if (!chatError || !chatError.retryText) return
+    const { retryText, image } = chatError
     setChatError(null)
-    sendMessage(retryText)
+    sendMessage(retryText, image)
   }
 
   const courseTitle = course?.courseName ?? courseCode
@@ -450,7 +472,13 @@ export default function CoursePage() {
                   </div>
                   <div className={`p-3 text-sm leading-relaxed break-words ${msg.role === "user" ? "rounded-xl rounded-tl-none bg-[#ff7a3d] text-[#12161f] text-left" : "rounded-xl rounded-tr-none bg-[#161b26] text-neutral-100"}`}>
                     {msg.role === "user" ? (
-                      msg.text
+                      <div className="flex flex-col gap-2">
+                        {msg.imagePreview && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={msg.imagePreview} alt="תמונה שצורפה לשאלה" className="rounded-lg max-h-48 object-contain" />
+                        )}
+                        <span>{msg.text}</span>
+                      </div>
                     ) : (
                       <>
                         <MarkdownMessage content={msg.text} />
@@ -472,21 +500,54 @@ export default function CoursePage() {
                 </div>
                 <div className="p-3 rounded-xl rounded-tr-none text-sm leading-relaxed bg-[#2a1414] text-red-300 border border-red-900/50 flex flex-col gap-2">
                   <span>{chatError.message}</span>
-                  <button
-                    type="button"
-                    onClick={handleRetry}
-                    className="self-start flex items-center gap-1 text-xs text-red-200 hover:text-white bg-red-900/40 hover:bg-red-900/70 border border-red-800 rounded px-2 py-1 transition-colors"
-                  >
-                    <RotateCcw size={12} />
-                    נסה שוב
-                  </button>
+                  {chatError.retryText && (
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="self-start flex items-center gap-1 text-xs text-red-200 hover:text-white bg-red-900/40 hover:bg-red-900/70 border border-red-800 rounded px-2 py-1 transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      נסה שוב
+                    </button>
+                  )}
                 </div>
               </div>
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-[#242b3a] p-4 bg-[#0a0e14]/20">
+          <CardFooter className="border-t border-[#242b3a] p-4 bg-[#0a0e14]/20 flex-col items-stretch gap-2">
+            {pendingImage && (
+              <div className="flex items-center gap-2 self-start bg-[#161b26] border border-[#242b3a] rounded-lg p-1.5 pr-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={pendingImage.previewUrl} alt="התמונה שתצורף" className="h-12 w-12 rounded object-cover" />
+                <span className="text-xs text-[#8b93a3]">התמונה תצורף לשאלה</span>
+                <button
+                  type="button"
+                  onClick={() => setPendingImage(null)}
+                  className="text-[#8b93a3] hover:text-white p-1"
+                  aria-label="הסר תמונה"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
             <div className="flex w-full gap-2 items-center">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handlePickImage}
+              />
+              <Button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isLoading}
+                aria-label="צרף תמונה"
+                className="bg-[#161b26] hover:bg-[#242b3a] text-[#8b93a3] hover:text-[#ffb066] border border-[#242b3a] h-12 px-3 rounded-full transition-all duration-300"
+              >
+                <ImagePlus size={18} />
+              </Button>
               <Input
                 type="text"
                 placeholder={`שאל אותי על חומר הלימוד של ${courseTitle}...`}

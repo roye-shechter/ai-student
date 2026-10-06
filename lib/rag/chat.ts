@@ -1,25 +1,39 @@
-import type Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/prisma"
 import {
   assertEmbeddingEnv,
   assertLlmEnv,
   CHAT_MODEL,
   EMBEDDING_MODEL,
-  getAnthropic,
+  GEMINI_VERIFIER_MODEL,
   getOpenAI,
-  HARD_CHAT_MODEL,
   toVectorSql,
 } from "./clients"
+import type { TokenUsage } from "@/lib/llm/pricing"
+import {
+  chooseRoute,
+  FIRST_TOKEN_TIMEOUT_MS,
+  ROUTE_FALLBACKS,
+  ROUTE_LIMITS,
+  ROUTE_TARGETS,
+  type ModelTarget,
+  type Route,
+} from "@/lib/llm/route"
+import { streamModel, type ImageInput } from "@/lib/llm/stream"
+import { buildTutorSystem } from "@/lib/llm/tutor-prompt"
+import { verifyAnswer, type Verdict } from "@/lib/llm/verify"
+import { logModelUsage } from "@/lib/llm/usage"
 
 /**
- * Retrieval + chat pipeline.
+ * Retrieval + routed answer pipeline.
  *
  * 1. Embed the user query (OpenAI).
  * 2. Query document_chunks (pgvector) via cosine-distance ORDER BY, filtered strictly by
  *    { userId, courseId } so a tenant only ever sees their own chunks.
  * 3. Load recent ChatMessage history from Postgres (conversational memory).
- * 4. Assemble a structured prompt and answer with the LLM (Anthropic Claude).
- * 5. Persist the user + assistant turns back to Postgres.
+ * 4. Pick the model for this turn (lib/llm/route.ts) and stream its answer.
+ * 5. On hard/visual turns, a second model reviews the answer; a specific error
+ *    is appended to the reply as a visible note.
+ * 6. Persist the user + assistant turns and log per-model usage.
  */
 
 const DEFAULT_TOP_K = 5
@@ -27,106 +41,8 @@ const DEFAULT_TOP_K = 5
 // "remember" the immediate past and pick up where the student left off,
 // without overflowing the context window with the entire session history.
 const DEFAULT_HISTORY_LIMIT = 15
-// The "hard" path spends extra tokens on thinking + code-execution tool
-// turns before it ever writes the answer, so it gets a larger cap than the
-// fast conversational path.
-const MAX_OUTPUT_TOKENS_SIMPLE = 4096
+const MAX_OUTPUT_TOKENS_STANDARD = 4096
 const MAX_OUTPUT_TOKENS_HARD = 8192
-
-/**
- * Cheap, local heuristic that decides whether a message needs the "hard"
- * path (extended thinking + a code-execution tool for verified math) or the
- * fast conversational path. Intentionally NOT an extra LLM call — that would
- * add exactly the latency this is meant to avoid. Biased towards "simple":
- * a false negative just means a slightly less rigorous answer, a false
- * positive costs latency, so ambiguous cases default to fast.
- */
-const HARD_MATH_SYMBOLS = /[∫∑∂√≈±×÷]|\\frac|\\int|\\sum|\\sqrt|\bd\/dx\b/i
-const HARD_TASK_VERBS =
-  /(חשב|פתור|הוכח|גזור|נגזרת|אינטגרל|מטריצ|משוואה|אופטימיזצי|מעגל חשמלי|נוסחה)/
-const OPERATOR_CHARS = /[+\-*/=^]/g
-const DIGIT_CHARS = /[0-9]/g
-
-export function classifyComplexity(message: string): "simple" | "hard" {
-  if (HARD_MATH_SYMBOLS.test(message) || HARD_TASK_VERBS.test(message)) {
-    return "hard"
-  }
-  const digitCount = (message.match(DIGIT_CHARS) ?? []).length
-  const operatorCount = (message.match(OPERATOR_CHARS) ?? []).length
-  const density = message.length > 0 ? (digitCount + operatorCount) / message.length : 0
-  if (digitCount >= 3 && density > 0.15) {
-    return "hard"
-  }
-  return "simple"
-}
-
-/**
- * Build the Claude system instruction for a persistent, active-learning
- * academic tutor, split into two blocks so the (large, per-user-identical)
- * policy text can be prompt-cached across every user and every turn:
- *
- *   1. A static block — the persona and policies A-D below — marked with an
- *      ephemeral cache breakpoint. Byte-identical for every request, so it
- *      must never have the student's name (or anything else request-specific)
- *      interpolated into it; that would break the cache-prefix match.
- *   2. A small dynamic block with just the student's name.
- *
- * Policies:
- *   A. Persistent memory  — treat the supplied history as the tutor's memory,
- *      never ask the student to repeat, pick up where the last turn left off.
- *   B. Knowledge policy    — prioritise the uploaded course material and cite
- *      filenames, but allow external knowledge for analogies, simpler
- *      explanations, and worked examples of hard EE/CS concepts; verify any
- *      numeric/symbolic computation with the code-execution tool when one is
- *      available, instead of computing "by hand".
- *   C. Smart-quiz policy   — don't quiz on every turn; only offer a mini-quiz
- *      after a complex topic is fully explained, on a topic transition, or on
- *      explicit request.
- *   D. Format & tone       — supportive academic tutor, rich structured
- *      Markdown, always answer in Hebrew, emit clean UTF-8 (no corrupted
- *      unicode) to avoid gibberish output.
- */
-function buildSystemInstruction(userName: string): Anthropic.TextBlockParam[] {
-  const staticPolicy = [
-    "אתה מורה פרטי אוניברסיטאי מומחה ללימודי הנדסת חשמל ומדעי המחשב (EE/CS), סבלני, מעודד ופעיל.",
-    "",
-    "א. זיכרון מתמשך (Persistent Memory):",
-    "- התייחס להיסטוריית השיחה המצורפת כאל הזיכרון שלך. אל תבקש מהסטודנט לחזור על דברים שכבר נאמרו.",
-    "- הכר בהתקדמות הקודמת של הסטודנט והמשך בדיוק מהנקודה שבה הסתיימה ההודעה האחרונה.",
-    "",
-    "ב. מדיניות ידע (Knowledge Policy):",
-    "- תן עדיפות עליונה לחומרי הלימוד שהועלו (Context). כאשר אתה מסתמך על חומר כזה — ציין את שם הקובץ.",
-    "- מותר לך להשתמש בידע חיצוני שלך כדי לספק אנלוגיות, הסברים פשוטים יותר ודוגמאות למושגים מורכבים ב-EE/CS, גם אם אינם מופיעים בחומר.",
-    "- כשאתה משלים מהידע הכללי שלך מעבר לחומר הקורס, ציין זאת בעדינות (לדוגמה: \"בנוסף לחומר, אפשר לחשוב על זה כך...\").",
-    "- כאשר עומד לרשותך כלי הרצת קוד (code execution) — השתמש בו כדי לאמת כל חישוב מספרי או סימבולי (חשבון, אלגברה, אינטגרלים, נגזרות, מטריצות וכו') במקום לחשב \"בעל פה\". אל תציג תוצאת חישוב מדויקת מבלי לוודא אותה דרך הכלי כשהוא זמין.",
-    "",
-    "מטא-דאטה של מקורות (חשוב):",
-    "- כל קטע בהקשר (Context) מסומן בשורת מקור בפורמט [Source File: שם הקובץ, Uploaded At: זמן ההעלאה] ואחריה הטקסט עצמו.",
-    "- הסטודנט עשוי לשאול שאלות על קובץ מסוים (לדוגמה: \"על בסיס הקובץ 'math_summary.pdf'...\") או לבקש לעבור על החומר לפי סדר ההעלאה הכרונולוגי.",
-    "- השתמש בשדות [Source File] ו-[Uploaded At] כדי לענות על בקשות כאלה בדייקנות, ולפי סדר זמני העלאה כשמתבקש. ציין את שם הקובץ בתשובה כאשר הדבר מסייע.",
-    "",
-    "ג. מדיניות תרגול חכמה (Smart Quiz):",
-    "- אל תבחן את הסטודנט בכל הודעה.",
-    "- הצע שאלת תרגול קצרה (mini-quiz) או אתגר רק כאשר נושא מורכב הוסבר במלואו, בעת מעבר לנושא חדש, או כאשר הסטודנט מבקש זאת במפורש.",
-    "",
-    "ד. עיצוב, טון וקידוד (חובה):",
-    "- טון של מורה פרטי תומך ואקדמי: מעודד, ידידותי וברור.",
-    "- לעולם אל תחזיר 'קיר טקסט' ארוך ורציף. חובה להשתמש בעיצוב Markdown עשיר: פסקאות קצרות, רשימות תבליטים (bullet points), הדגשת מונחי מפתח ב-**הדגשה**, וכותרות היררכיות ברורות (## / ###).",
-    "- ארגן תשובות ארוכות בסעיפים עם כותרות, כך שיהיה קל לקרוא ולסרוק אותן.",
-    "- ענה אך ורק בעברית.",
-    "- ודא שהפלט שלך משתמש בתווי עברית תקניים ב-UTF-8 ובסימנים מתמטיים סטנדרטיים. הימנע מפורמט יוניקוד פגום או מתווים משובשים.",
-  ].join("\n")
-
-  const personalGreeting = [
-    `שם הסטודנט הוא ${userName}.`,
-    `בתחילת השיחה (כאשר עדיין אין היסטוריית שיחה) פתח תמיד בברכה אישית — לדוגמה: "שלום ${userName}," — ורק לאחר מכן ענה לגופו של עניין.`,
-  ].join("\n")
-
-  return [
-    { type: "text", text: staticPolicy, cache_control: { type: "ephemeral" } },
-    { type: "text", text: personalGreeting },
-  ]
-}
 
 export type RetrievedChunk = {
   text: string
@@ -282,24 +198,24 @@ export type ChatParams = {
   courseId: string
   sessionId: string
   message: string
+  image?: ImageInput
   topK?: number
   historyLimit?: number
-  /** Aborts the in-flight Anthropic call when the client disconnects (see chatStream). */
+  /** Aborts the in-flight model call when the client disconnects (see chatStream). */
   signal?: AbortSignal
 }
 
 export type ChatStreamEvent =
-  | { type: "sources"; chunks: RetrievedChunk[] }
+  | { type: "sources"; chunks: RetrievedChunk[]; route: Route; model: string }
   | { type: "delta"; text: string }
   | { type: "done" }
 
 /**
- * Full RAG turn, streamed: retrieve + remember + answer + persist, yielding
- * the answer token-by-token instead of waiting for the full response —
- * important for long, richly-formatted Hebrew answers. `sessionId` must
- * reference a ChatSession that belongs to (userId, courseId).
+ * Full RAG turn, streamed: retrieve + route + answer + verify + persist,
+ * yielding the answer token-by-token. `sessionId` must reference a ChatSession
+ * that belongs to (userId, courseId).
  *
- * The user's turn is persisted immediately (before the LLM call), so history
+ * The user's turn is persisted immediately (before the model call), so history
  * survives even if the stream fails mid-flight. The assistant's turn is
  * persisted from whatever text accumulated by the time the loop exits,
  * successful or not — a partial answer beats a silently dropped one.
@@ -308,50 +224,82 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
   assertEmbeddingEnv()
   assertLlmEnv()
 
-  const { userId, userName, courseId, sessionId, message, topK, historyLimit, signal } = params
+  const { userId, userName, courseId, sessionId, message, image, topK, historyLimit, signal } = params
 
+  const route = chooseRoute(message, { hasImage: !!image })
+  const limits = ROUTE_LIMITS[route]
   const [chunks, history, weakTopics] = await Promise.all([
-    retrieveContext({ userId, courseId, query: message, topK }),
-    getRecentHistory(sessionId, historyLimit),
+    retrieveContext({ userId, courseId, query: message, topK: limits?.topK ?? topK }),
+    getRecentHistory(sessionId, limits?.historyLimit ?? historyLimit),
     getWeakTopics(userId, courseId),
   ])
 
-  await prisma.chatMessage.create({ data: { sessionId, role: "user", content: message } })
+  const persistedMessage = image ? `${message}\n\n[צורפה תמונה]` : message
+  await prisma.chatMessage.create({ data: { sessionId, role: "user", content: persistedMessage } })
 
-  yield { type: "sources", chunks }
+  const target = ROUTE_TARGETS[route]
+  yield { type: "sources", chunks, route, model: target.model }
 
+  const system = buildTutorSystem(userName)
   const prompt = buildPrompt({ chunks, history, weakTopics, query: message })
-  const anthropic = getAnthropic()
-
-  // Route by complexity: the fast path is the current default (no thinking,
-  // no tools), the hard path spends extra latency on adaptive extended
-  // thinking + a hosted code-execution tool so numeric/symbolic answers are
-  // verified rather than guessed. See classifyComplexity() above.
-  const isHard = classifyComplexity(message) === "hard"
-
-  const stream = anthropic.messages.stream(
-    {
-      model: isHard ? HARD_CHAT_MODEL : CHAT_MODEL,
-      max_tokens: isHard ? MAX_OUTPUT_TOKENS_HARD : MAX_OUTPUT_TOKENS_SIMPLE,
-      system: buildSystemInstruction(userName),
-      messages: [{ role: "user", content: prompt }],
-      ...(isHard
-        ? {
-            thinking: { type: "adaptive" as const },
-            output_config: { effort: "high" as const },
-            tools: [{ type: "code_execution_20260521" as const, name: "code_execution" as const }],
-          }
-        : {}),
-    },
-    { signal }
-  )
 
   let answer = ""
   try {
-    for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        answer += event.delta.text
-        yield { type: "delta", text: event.delta.text }
+    answer = yield* answerWithFallback({
+      userId,
+      courseId,
+      route,
+      target,
+      system,
+      prompt,
+      image,
+      signal,
+    })
+
+    if ((route === "hard" || route === "visual") && answer && !signal?.aborted) {
+      const reviewer: ModelTarget =
+        route === "hard" ? { provider: "gemini", model: GEMINI_VERIFIER_MODEL } : { provider: "anthropic", model: CHAT_MODEL }
+      const started = Date.now()
+      let verdict: Verdict | null = null
+      try {
+        const review = await verifyAnswer({
+          target: reviewer,
+          question: message,
+          answer,
+          context: chunks.map((c) => c.text).join("\n\n"),
+          image: route === "visual" ? image : undefined,
+          signal,
+        })
+        verdict = review.verdict
+        await logModelUsage({
+          userId,
+          courseId,
+          provider: reviewer.provider,
+          model: reviewer.model,
+          route: "verify",
+          feature: "verify",
+          usage: review.usage,
+          latencyMs: Date.now() - started,
+          ok: verdict !== null,
+        })
+      } catch (error) {
+        console.error("[non-fatal] verifier failed; answer delivered unreviewed:", error)
+        await logModelUsage({
+          userId,
+          courseId,
+          provider: reviewer.provider,
+          model: reviewer.model,
+          route: "verify",
+          feature: "verify",
+          usage: null,
+          latencyMs: Date.now() - started,
+          ok: false,
+        })
+      }
+      if (verdict && !verdict.ok) {
+        const note = `\n\n---\n**נקודה לבדיקה נוספת:** ${verdict.issues}`
+        answer += note
+        yield { type: "delta", text: note }
       }
     }
   } finally {
@@ -363,4 +311,99 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
   }
 
   yield { type: "done" }
+}
+
+/**
+ * Streams the routed model's answer. If a provider fails before producing any
+ * text (missing key, rate limit, outage, or no first token in time), the turn
+ * moves to the next model in the chain: route fallbacks, then the standard
+ * Claude path. Every attempt is logged; the original model is kept in
+ * `fallbackFrom`. A failure after text has reached the student is not retried.
+ */
+async function* answerWithFallback(args: {
+  userId: string
+  courseId: string
+  route: Route
+  target: ModelTarget
+  system: ReturnType<typeof buildTutorSystem>
+  prompt: string
+  image?: ImageInput
+  signal?: AbortSignal
+}): AsyncGenerator<ChatStreamEvent, string> {
+  const { userId, courseId, route, system, prompt, image, signal } = args
+  const chain = [args.target, ...ROUTE_FALLBACKS[route], ROUTE_TARGETS.standard].filter(
+    (target, index, all) => all.findIndex((t) => t.model === target.model) === index
+  )
+  const primaryModel = args.target.model
+  let text = ""
+
+  for (const target of chain) {
+    const fallbackFrom = target.model === primaryModel ? undefined : primaryModel
+    const started = Date.now()
+    let usage: TokenUsage | null = null
+    const attempt = new AbortController()
+    const onCallerAbort = () => attempt.abort()
+    signal?.addEventListener("abort", onCallerAbort)
+    const firstTokenTimeout = FIRST_TOKEN_TIMEOUT_MS[route]
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const armTimer = () => {
+      if (firstTokenTimeout !== undefined) {
+        timer = setTimeout(() => attempt.abort(new Error("no first token in time")), firstTokenTimeout)
+      }
+    }
+    armTimer()
+
+    try {
+      const verifiedMath = route === "hard" && target.provider === "anthropic"
+      for await (const part of streamModel({
+        target,
+        system,
+        userPrompt: prompt,
+        image: target.provider === "groq" ? undefined : image,
+        verifiedMath,
+        maxOutputTokens: ROUTE_LIMITS[route]?.maxOutputTokens ?? (verifiedMath ? MAX_OUTPUT_TOKENS_HARD : MAX_OUTPUT_TOKENS_STANDARD),
+        signal: attempt.signal,
+      })) {
+        if (part.type === "delta") {
+          if (timer) clearTimeout(timer)
+          text += part.text
+          yield { type: "delta", text: part.text }
+        } else {
+          usage = part.usage
+        }
+      }
+      await logModelUsage({
+        userId,
+        courseId,
+        provider: target.provider,
+        model: target.model,
+        route,
+        feature: "chat",
+        usage,
+        latencyMs: Date.now() - started,
+        ok: true,
+        fallbackFrom,
+      })
+      return text
+    } catch (error) {
+      await logModelUsage({
+        userId,
+        courseId,
+        provider: target.provider,
+        model: target.model,
+        route,
+        feature: "chat",
+        usage,
+        latencyMs: Date.now() - started,
+        ok: false,
+        fallbackFrom,
+      })
+      if (signal?.aborted || text.length > 0 || target === chain[chain.length - 1]) throw error
+      console.error(`[routing] ${target.model} failed, trying next model:`, error instanceof Error ? error.message : error)
+    } finally {
+      if (timer) clearTimeout(timer)
+      signal?.removeEventListener("abort", onCallerAbort)
+    }
+  }
+  return text
 }

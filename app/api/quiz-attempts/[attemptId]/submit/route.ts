@@ -83,7 +83,7 @@ export async function POST(
       referenceAnswer: q.correctAnswer ?? "",
       studentAnswer: answerByQuestionId.get(q.id) ?? "",
     }))
-    const gradedShort = await gradeShortAnswers(toGrade)
+    const gradedShort = await gradeShortAnswers(toGrade, { userId, courseId: attempt.courseId })
     const gradedById = new Map(gradedShort.map((g) => [g.questionId, g]))
 
     const shortResults = shortQuestions.map((q) => {

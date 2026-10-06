@@ -37,6 +37,21 @@ type ChatRequestBody = {
   courseCode?: unknown
   courseId?: unknown
   sessionId?: unknown
+  image?: unknown
+}
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
+// Client-side compression keeps uploads around 1 MB; this is the hard ceiling.
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024
+
+function parseImage(raw: unknown): { mimeType: (typeof ALLOWED_IMAGE_TYPES)[number]; base64: string } | null | "invalid" {
+  if (raw === undefined || raw === null) return null
+  if (typeof raw !== "object") return "invalid"
+  const { mimeType, base64 } = raw as { mimeType?: unknown; base64?: unknown }
+  if (typeof mimeType !== "string" || !(ALLOWED_IMAGE_TYPES as readonly string[]).includes(mimeType)) return "invalid"
+  if (typeof base64 !== "string" || base64.length === 0) return "invalid"
+  if (Math.floor((base64.length * 3) / 4) > MAX_IMAGE_BYTES) return "invalid"
+  return { mimeType: mimeType as (typeof ALLOWED_IMAGE_TYPES)[number], base64 }
 }
 
 function ndjson(obj: unknown): Uint8Array {
@@ -89,6 +104,11 @@ export async function POST(req: Request) {
     const message = typeof body.message === "string" ? body.message.trim() : ""
     if (!message) {
       return NextResponse.json({ error: "message is required" }, { status: 400 })
+    }
+
+    const image = parseImage(body.image)
+    if (image === "invalid") {
+      return NextResponse.json({ error: "Unsupported or oversized image" }, { status: 400 })
     }
 
     // 4. Resolve the course. The UI identifies a course by its human courseCode
@@ -163,11 +183,12 @@ export async function POST(req: Request) {
             courseId: course.id,
             sessionId,
             message,
+            image: image ?? undefined,
             signal: abortController.signal,
           })) {
             if (closed) break
             if (event.type === "sources") {
-              safeEnqueue({ type: "sources", chunks: event.chunks, sessionId })
+              safeEnqueue({ type: "sources", chunks: event.chunks, sessionId, route: event.route, model: event.model })
             } else if (event.type === "delta") {
               safeEnqueue({ type: "delta", text: event.text })
             } else {
