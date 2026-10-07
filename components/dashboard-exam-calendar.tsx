@@ -92,7 +92,7 @@ export function DashboardExamCalendar() {
     )
   }
 
-  if (entries.length === 0) return null
+  const hasEntries = entries.length > 0
 
   return (
     <section className="dash-course-card grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 glass-panel border border-[#242b3a] rounded-sm p-6">
@@ -142,8 +142,12 @@ export function DashboardExamCalendar() {
           <CalendarDays size={16} />
           הבחינות הקרובות שלך
         </h3>
-        {upcoming.length === 0 ? (
-          <p className="text-xs text-neutral-500">אין בחינות קרובות מתוזמנות.</p>
+        {!hasEntries ? (
+          <p className="text-xs text-neutral-500">
+            עדיין לא הוגדרו מועדי בחינות באף קורס. היכנס לעמוד של קורס ותמצא את הכרטיס &quot;מועדי בחינות&quot; כדי להוסיף.
+          </p>
+        ) : upcoming.length === 0 ? (
+          <p className="text-xs text-neutral-500">כל הבחינות שהוגדרו כבר עברו.</p>
         ) : (
           <ul className="space-y-2">
             {upcoming.map((e) => (

@@ -14,11 +14,13 @@ import { NameDocumentDialog } from "@/components/name-document-dialog"
 import { ManageMaterialsDialog } from "@/components/manage-materials-dialog"
 import { ExamDatesCard, type ExamDateEntry } from "@/components/exam-dates-card"
 import { TutorAvatar } from "@/components/tutor-avatar"
+import { CourseProgressSnapshot } from "@/components/course-progress-snapshot"
+import { TutorBoard, extractBoardItems } from "@/components/tutor-board"
 import { gsap, useGSAP } from "@/lib/gsap"
 import { prepareChatImage, type ChatImage } from "@/lib/chat-image"
 import {
-  FolderOpen, ArrowRight, ArrowLeft, Send, User, AlertCircle, Square, RotateCcw, GraduationCap, TrendingUp,
-  ImagePlus, X,
+  FolderOpen, ArrowRight, ArrowLeft, Send, User, AlertCircle, Square, RotateCcw, GraduationCap,
+  ImagePlus, X, Maximize2, Minimize2, PenLine,
 } from "lucide-react"
 
 type CourseInfo = {
@@ -96,7 +98,33 @@ export default function CoursePage() {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [showManageDialog, setShowManageDialog] = useState(false)
 
+  // Fullscreen hides the materials/exam/progress sidebar entirely so the
+  // chat gets the whole width — "שכל המסך כולו יהיה צ'אט". The live board
+  // is part of "the rest" too, so it's forced closed while fullscreen.
+  const [fullscreen, setFullscreen] = useState(false)
+  const [boardOpen, setBoardOpen] = useState(false)
+  const boardAutoOpenedRef = useRef(false)
+
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // The board is a running transcript of every formula/diagram the tutor has
+  // written so far this session, not just the latest turn — once drawn, it
+  // stays on the board.
+  const assistantTranscript = messages
+    .filter((m) => m.role === "assistant")
+    .map((m) => m.text)
+    .join("\n\n")
+  const boardItemCount = extractBoardItems(assistantTranscript).length
+
+  // Open the board automatically the first time the tutor actually draws
+  // something — the student shouldn't have to know the button exists to
+  // benefit from it. Only fires once; closing it manually afterwards sticks.
+  useEffect(() => {
+    if (boardItemCount > 0 && !boardAutoOpenedRef.current) {
+      boardAutoOpenedRef.current = true
+      setBoardOpen(true)
+    }
+  }, [boardItemCount])
 
   useGSAP(
     () => {
@@ -362,104 +390,117 @@ export default function CoursePage() {
         </div>
       </div>
 
-      <div className="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+      <div className={`flex-1 w-full mx-auto flex flex-col lg:flex-row gap-6 p-6 ${fullscreen ? "max-w-none" : "max-w-7xl"}`}>
 
-        {/* חלק ימין: חומרי לימוד */}
-        <div className="space-y-6 flex flex-col">
-          {/* The hidden file input has to live somewhere in the DOM — it's
-              triggered from inside ManageMaterialsDialog now (onRequestUpload),
-              not from a dropzone on the page itself. */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
-            onChange={onFileSelected}
-            className="hidden"
-            disabled={isUploading}
-          />
+        {/* חלק ימין: חומרי לימוד, מועדי בחינות, התקדמות — מועלם במסך מלא */}
+        {!fullscreen && (
+          <div className="space-y-6 flex flex-col w-full lg:w-[320px] shrink-0">
+            {/* The hidden file input has to live somewhere in the DOM — it's
+                triggered from inside ManageMaterialsDialog now (onRequestUpload),
+                not from a dropzone on the page itself. */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
+              onChange={onFileSelected}
+              className="hidden"
+              disabled={isUploading}
+            />
 
-          <div className="course-info-card glass-panel border border-[#242b3a] rounded-sm p-6 space-y-1">
-            <h1 className="font-serif gold-text text-3xl">{courseTitle}</h1>
-            {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
-          </div>
+            <div className="course-info-card glass-panel border border-[#242b3a] rounded-sm p-6 space-y-1">
+              <h1 className="font-serif gold-text text-3xl">{courseTitle}</h1>
+              {course?.description && <p className="text-neutral-400 text-sm">{course.description}</p>}
+            </div>
 
-          {course?.id && (
-            <ExamDatesCard courseId={course.id} examDates={examDates} onChanged={loadExamDates} />
-          )}
+            {course?.id && (
+              <ExamDatesCard courseId={course.id} examDates={examDates} onChanged={loadExamDates} />
+            )}
 
-          {/* Three matching entry points — one clean job each, same visual
-              weight, instead of the old dropzone-plus-list mix. */}
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setShowManageDialog(true)}
-              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
-            >
-              <span className="tech-scan" />
-              <span className="tech-corner tech-corner-tl" />
-              <span className="tech-corner tech-corner-tr" />
-              <span className="tech-corner tech-corner-bl" />
-              <span className="tech-corner tech-corner-br" />
-              <span className="relative flex items-center gap-3">
-                <FolderOpen size={18} className="text-[#ffb066]" />
-                <span className="flex flex-col items-start text-right">
-                  <span className="text-white">חומרי הקורס</span>
-                  <span className="text-[11px] text-neutral-500">
-                    {docsLoading
-                      ? "טוען..."
-                      : docsError
-                        ? docsError
-                        : documents.length === 0
-                          ? "העלה חומרי למידה"
-                          : `${documents.length} חומרים`}
+            {/* התקדמות גלויה מיד בעמוד הקורס עצמו — לא רק אחרי מעבר לעמוד נפרד. */}
+            {course?.id && <CourseProgressSnapshot courseId={course.id} courseCode={courseCode} />}
+
+            {/* Two matching entry points — one clean job each, same visual
+                weight, instead of the old dropzone-plus-list mix. */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowManageDialog(true)}
+                className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
+              >
+                <span className="tech-scan" />
+                <span className="tech-corner tech-corner-tl" />
+                <span className="tech-corner tech-corner-tr" />
+                <span className="tech-corner tech-corner-bl" />
+                <span className="tech-corner tech-corner-br" />
+                <span className="relative flex items-center gap-3">
+                  <FolderOpen size={18} className="text-[#ffb066]" />
+                  <span className="flex flex-col items-start text-right">
+                    <span className="text-white">חומרי הקורס</span>
+                    <span className="text-[11px] text-neutral-500">
+                      {docsLoading
+                        ? "טוען..."
+                        : docsError
+                          ? docsError
+                          : documents.length === 0
+                            ? "העלה חומרי למידה"
+                            : `${documents.length} חומרים`}
+                    </span>
                   </span>
                 </span>
-              </span>
-              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
-            </button>
+                <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
+              </button>
 
-            <Link
-              href={`/dashboard/${courseCode}/quiz`}
-              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
-            >
-              <span className="tech-scan" />
-              <span className="tech-corner tech-corner-tl" />
-              <span className="tech-corner tech-corner-tr" />
-              <span className="tech-corner tech-corner-bl" />
-              <span className="tech-corner tech-corner-br" />
-              <span className="relative flex items-center gap-3">
-                <GraduationCap size={18} className="text-[#ffb066]" />
-                <span className="text-white">התחל מבחן תרגול</span>
-              </span>
-              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
-            </Link>
-
-            <Link
-              href={`/dashboard/${courseCode}/progress`}
-              className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
-            >
-              <span className="tech-scan" />
-              <span className="tech-corner tech-corner-tl" />
-              <span className="tech-corner tech-corner-tr" />
-              <span className="tech-corner tech-corner-bl" />
-              <span className="tech-corner tech-corner-br" />
-              <span className="relative flex items-center gap-3">
-                <TrendingUp size={18} className="text-[#ffb066]" />
-                <span className="text-white">התקדמות בקורס</span>
-              </span>
-              <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
-            </Link>
+              <Link
+                href={`/dashboard/${courseCode}/quiz`}
+                className="group/tech relative w-full flex items-center justify-between gap-3 p-4 glass-panel tech-glow-border overflow-hidden border border-[#242b3a] rounded-sm text-sm transition-all duration-300"
+              >
+                <span className="tech-scan" />
+                <span className="tech-corner tech-corner-tl" />
+                <span className="tech-corner tech-corner-tr" />
+                <span className="tech-corner tech-corner-bl" />
+                <span className="tech-corner tech-corner-br" />
+                <span className="relative flex items-center gap-3">
+                  <GraduationCap size={18} className="text-[#ffb066]" />
+                  <span className="text-white">התחל מבחן תרגול</span>
+                </span>
+                <ArrowLeft size={14} className="relative text-[#ffb066] shrink-0" />
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* חלק שמאל: הצ'אט האמיתי */}
-        <Card className="course-chat-card glass-panel border-[#242b3a] text-white lg:col-span-2 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
-          <CardHeader className="border-b border-[#242b3a] pb-4">
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <TutorAvatar className="text-[#ff7a3d]" size={22} />
-              המורה הפרטי שלך לקורס
-            </CardTitle>
-            <CardDescription className="text-neutral-400 text-xs">שאל כל שאלה על החומר — המורה הפרטי מלמד ומסביר בהתבסס אך ורק על מסמכי הקורס שהעלית.</CardDescription>
+        <Card className="course-chat-card glass-panel border-[#242b3a] text-white flex-1 min-w-0 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
+          <CardHeader className="border-b border-[#242b3a] pb-4 flex flex-row items-start justify-between">
+            <div>
+              <CardTitle className="text-lg text-white flex items-center gap-2">
+                <TutorAvatar className="text-[#ff7a3d]" size={22} />
+                המורה הפרטי שלך לקורס
+              </CardTitle>
+              <CardDescription className="text-neutral-400 text-xs mt-1">שאל כל שאלה על החומר — המורה הפרטי מלמד ומסביר בהתבסס אך ורק על מסמכי הקורס שהעלית.</CardDescription>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {!fullscreen && (
+                <button
+                  type="button"
+                  onClick={() => setBoardOpen((v) => !v)}
+                  aria-label={boardOpen ? "סגור את הלוח החי" : "פתח את הלוח החי"}
+                  title="הלוח החי — נוסחאות ותרשימים"
+                  className={`p-2 rounded-sm border transition-colors ${boardOpen ? "border-[#ff7a3d]/50 bg-[#ff7a3d]/15 text-[#ffb066]" : "border-[#242b3a] text-neutral-400 hover:text-white"}`}
+                >
+                  <PenLine size={15} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setFullscreen((v) => !v)}
+                aria-label={fullscreen ? "צא ממסך מלא" : "עבור למסך מלא"}
+                title={fullscreen ? "צא ממסך מלא" : "עבור למסך מלא"}
+                className="p-2 rounded-sm border border-[#242b3a] text-neutral-400 hover:text-white transition-colors"
+              >
+                {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
+            </div>
           </CardHeader>
 
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
@@ -569,6 +610,13 @@ export default function CoursePage() {
             </div>
           </CardFooter>
         </Card>
+
+        {/* הלוח החי: נוסחאות ותרשימים שהמורה "משרבט" בזמן ההסבר */}
+        {!fullscreen && boardOpen && (
+          <div className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-[calc(100vh-140px)]">
+            <TutorBoard content={assistantTranscript} onClose={() => setBoardOpen(false)} />
+          </div>
+        )}
 
       </div>
 
