@@ -179,34 +179,41 @@
     animation: tutor-pulse 2.5s ease-in-out infinite;
   }
 
-  /* Ambient background's brain-shaped neural network — each node pulses
-     on its own cycle (duration/delay set per-node inline, see
-     ambient-texture.tsx), each edge plays a travelling "signal" via
-     animated stroke-dashoffset, and the outline breathes slowly, reading
-     as a real (if faint) brain rather than a static sphere of dust.
-     transform-box: fill-box/center scales each circle from its own
+  /* Ambient background's orbital constellation — each node pulses on its
+     own cycle (duration/delay set per-node inline, see
+     ambient-texture.tsx), each line plays a travelling "signal" via
+     animated stroke-dashoffset, the halo ring turns slowly around the
+     glow, and a few light streaks drift upward out of the glow and fade.
+     transform-box: fill-box/center scales/rotates each shape from its own
      middle, not the SVG canvas's (0,0) — the CSS default for SVG shapes,
-     which would otherwise make every node drift as it pulses instead of
-     staying in place. */
-  .ambient-brain-node {
+     which would otherwise make everything drift instead of staying in
+     place. */
+  .ambient-node {
     transform-box: fill-box;
     transform-origin: center;
-    animation-name: brain-node-pulse;
+    animation-name: ambient-node-pulse;
     animation-timing-function: ease-in-out;
     animation-iteration-count: infinite;
   }
 
-  .ambient-brain-edge {
-    animation-name: brain-signal;
+  .ambient-signal {
+    animation-name: ambient-signal-travel;
     animation-timing-function: linear;
     animation-iteration-count: infinite;
   }
 
-  .ambient-brain-outline {
-    transform-box: view-box;
-    transform-origin: 50% 50%;
-    opacity: 0.3;
-    animation: brain-breathe 7s ease-in-out infinite;
+  .ambient-ring {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ambient-ring-spin 48s linear infinite;
+  }
+
+  .ambient-streak {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation-name: ambient-streak-rise;
+    animation-timing-function: ease-out;
+    animation-iteration-count: infinite;
   }
 
   /* A new item arriving in a live list (a chat bubble) — functional
@@ -283,18 +290,25 @@
   50% { transform: scale(1.18); opacity: 0.9; }
 }
 
-@keyframes brain-node-pulse {
+@keyframes ambient-node-pulse {
   0%, 100% { opacity: 0.25; transform: scale(0.85); }
   50% { opacity: 1; transform: scale(1.25); }
 }
 
-@keyframes brain-signal {
+@keyframes ambient-signal-travel {
   to { stroke-dashoffset: -160; }
 }
 
-@keyframes brain-breathe {
-  0%, 100% { opacity: 0.24; transform: scale(1); }
-  50% { opacity: 0.38; transform: scale(1.015); }
+@keyframes ambient-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ambient-streak-rise {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: var(--ambient-streak-o, 0.5); }
+  75% { opacity: var(--ambient-streak-o, 0.5); }
+  100% { transform: translateY(var(--ambient-rise, -140px)); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce), (scripting: none) {
@@ -303,9 +317,10 @@
     transform: none !important;
   }
   .tutor-avatar-ring,
-  .ambient-brain-node,
-  .ambient-brain-edge,
-  .ambient-brain-outline {
+  .ambient-node,
+  .ambient-signal,
+  .ambient-ring,
+  .ambient-streak {
     animation: none !important;
   }
 }
