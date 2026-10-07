@@ -15,7 +15,7 @@ import { ManageMaterialsDialog } from "@/components/manage-materials-dialog"
 import { ExamDatesCard, type ExamDateEntry } from "@/components/exam-dates-card"
 import { TutorAvatar } from "@/components/tutor-avatar"
 import { CourseProgressSnapshot } from "@/components/course-progress-snapshot"
-import { TutorBoard, extractBoardItems } from "@/components/tutor-board"
+import { TutorBoard, extractBoardItems, stripBoardBlocks } from "@/components/tutor-board"
 import { gsap, useGSAP } from "@/lib/gsap"
 import { prepareChatImage, type ChatImage } from "@/lib/chat-image"
 import {
@@ -106,6 +106,7 @@ export default function CoursePage() {
   const boardAutoOpenedRef = useRef(false)
 
   const rootRef = useRef<HTMLDivElement>(null)
+  const boardPanelRef = useRef<HTMLDivElement>(null)
 
   // The board is a running transcript of every formula/diagram the tutor has
   // written so far this session, not just the latest turn — once drawn, it
@@ -135,6 +136,22 @@ export default function CoursePage() {
         .fromTo(".course-chat-card", { opacity: 0, x: 16 }, { opacity: 1, x: 0, duration: 0.5 }, "-=0.4")
     },
     { scope: rootRef }
+  )
+
+  // The board "jumping" open nicely when the tutor starts drawing — a quick
+  // slide+scale+fade from the chat's edge, instead of the panel just
+  // appearing instantly when boardOpen flips true (auto-open or manual).
+  useGSAP(
+    () => {
+      if (boardOpen && boardPanelRef.current) {
+        gsap.fromTo(
+          boardPanelRef.current,
+          { opacity: 0, x: 28, scale: 0.96 },
+          { opacity: 1, x: 0, scale: 1, duration: 0.5, ease: "power3.out" }
+        )
+      }
+    },
+    { dependencies: [boardOpen], scope: rootRef }
   )
 
   // Load the course's display info + this user's previously uploaded documents.
@@ -399,9 +416,15 @@ export default function CoursePage() {
           (no lg:h-screen on the root), so this only changes desktop. */}
       <div className={`flex-1 lg:min-h-0 w-full mx-auto flex flex-col lg:flex-row gap-6 p-6 ${fullscreen ? "max-w-none" : "max-w-7xl"}`}>
 
-        {/* חלק ימין: חומרי לימוד, מועדי בחינות, התקדמות — מועלם במסך מלא */}
+        {/* חלק ימין: חומרי לימוד, מועדי בחינות, התקדמות — מועלם במסך מלא.
+            lg:h-full + lg:overflow-y-auto give this column its own scroll
+            inside the fixed-height row above — without it, content taller
+            than the viewport (exam dates + progress snapshot + weak topics)
+            was simply clipped by the root's lg:overflow-hidden with no way
+            to reach it, which read as "the weak-topics section is empty"
+            when it was actually just cut off below the fold. */}
         {!fullscreen && (
-          <div className="space-y-6 flex flex-col w-full lg:w-[320px] shrink-0">
+          <div className="space-y-6 flex flex-col w-full lg:w-[320px] shrink-0 lg:h-full lg:overflow-y-auto lg:pl-1 scroll-smooth">
             {/* The hidden file input has to live somewhere in the DOM — it's
                 triggered from inside ManageMaterialsDialog now (onRequestUpload),
                 not from a dropzone on the page itself. */}
@@ -510,7 +533,7 @@ export default function CoursePage() {
             </div>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
+          <CardContent className="flex-1 overflow-y-auto scroll-smooth p-4 space-y-4 min-h-[300px]">
             {messages.map((msg, index) => {
               const isStreamingThisMessage = isLoading && streamStarted && index === messages.length - 1 && msg.role === "assistant"
               return (
@@ -529,7 +552,7 @@ export default function CoursePage() {
                       </div>
                     ) : (
                       <>
-                        <MarkdownMessage content={msg.text} />
+                        <MarkdownMessage content={stripBoardBlocks(msg.text)} />
                         {isStreamingThisMessage && (
                           <span className="inline-block w-1.5 h-4 bg-[#ffb066] animate-pulse align-middle ml-1" />
                         )}
@@ -620,7 +643,7 @@ export default function CoursePage() {
 
         {/* הלוח החי: נוסחאות ותרשימים שהמורה "משרבט" בזמן ההסבר */}
         {!fullscreen && boardOpen && (
-          <div className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-full">
+          <div ref={boardPanelRef} className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-full">
             <TutorBoard content={assistantTranscript} onClose={() => setBoardOpen(false)} />
           </div>
         )}

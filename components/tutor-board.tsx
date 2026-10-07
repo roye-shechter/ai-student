@@ -34,6 +34,26 @@ function extractBoardItems(markdown: string): BoardItem[] {
   return items
 }
 
+/**
+ * Removes the same closed $$...$$ / ```mermaid``` blocks that
+ * extractBoardItems() pulls onto the board from the chat bubble's own text.
+ * The tutor is instructed (tutor-prompt.ts) to write a complete, natural
+ * sentence pointing at the board around each block ("תראה בלוח שציירתי...")
+ * rather than burying the block mid-sentence, so stripping it here leaves
+ * flowing prose behind instead of the raw LaTeX/Mermaid source the student
+ * would otherwise see twice — once (unrendered) in the chat and again,
+ * properly rendered, on the board. An unclosed block (still streaming in)
+ * is left alone until its closing marker arrives, matching extractBoardItems.
+ */
+function stripBoardBlocks(markdown: string): string {
+  return markdown
+    .replace(/\$\$([\s\S]+?)\$\$/g, "")
+    .replace(/```mermaid\s*\n[\s\S]+?```/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
 let mermaidReady: Promise<typeof import("mermaid").default> | null = null
 function loadMermaid() {
   if (!mermaidReady) {
@@ -162,4 +182,4 @@ export function TutorBoard({ content, onClose }: { content: string; onClose: () 
   )
 }
 
-export { extractBoardItems }
+export { extractBoardItems, stripBoardBlocks }
