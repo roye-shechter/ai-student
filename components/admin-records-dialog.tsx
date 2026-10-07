@@ -12,6 +12,7 @@ import {
   formatSeconds,
   formatTokens,
 } from "@/lib/admin-time"
+import { useUsdToIlsRate } from "@/lib/use-exchange-rate"
 
 export type RecordKind = "calls" | "activity" | "learning"
 export type RecordFilters = { userId?: string; model?: string; route?: string }
@@ -73,6 +74,7 @@ export function AdminRecordsDialog({
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const rate = useUsdToIlsRate()
 
   const { userId, model, route } = filters
 
@@ -198,7 +200,7 @@ export function AdminRecordsDialog({
                       <td className="py-2 pl-4 font-mono text-xs text-[#ffb066]">{row.model}</td>
                       <td className="py-2 pl-4 text-neutral-300">{ROUTE_LABELS[row.route] ?? row.route}</td>
                       <td className="py-2 pl-4 tabular-nums">{formatTokens(row.inputTokens)} / {formatTokens(row.outputTokens)}</td>
-                      <td className="py-2 pl-4 tabular-nums">{formatIls(row.costUsd)}</td>
+                      <td className="py-2 pl-4 tabular-nums">{formatIls(row.costUsd, rate)}</td>
                       <td className="py-2 pl-4 tabular-nums">{row.latencyMs.toLocaleString()} ms</td>
                       <td className="py-2 text-xs">
                         {row.ok ? <span className="text-emerald-400">הצליח</span> : <span className="text-red-400">נכשל</span>}

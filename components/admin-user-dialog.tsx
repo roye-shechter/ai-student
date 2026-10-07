@@ -5,6 +5,7 @@ import { Loader2, AlertCircle, Cpu, Activity, GraduationCap } from "lucide-react
 import { AdminModal } from "@/components/admin-modal"
 import { readJson } from "@/lib/http"
 import { formatIls, formatSeconds } from "@/lib/admin-time"
+import { useUsdToIlsRate } from "@/lib/use-exchange-rate"
 import type { RecordKind, RecordFilters } from "@/components/admin-records-dialog"
 
 type UserDetail = {
@@ -55,6 +56,7 @@ export function AdminUserDialog({
   const [detail, setDetail] = useState<UserDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const rate = useUsdToIlsRate()
 
   useEffect(() => {
     let cancelled = false
@@ -103,7 +105,7 @@ export function AdminUserDialog({
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat label="קריאות למודלים" value={detail.totals.modelCalls.toLocaleString()} />
-            <Stat label="עלות מוערכת" value={formatIls(detail.totals.costUsd)} />
+            <Stat label="עלות מוערכת" value={formatIls(detail.totals.costUsd, rate)} />
             <Stat label="אירועי פעילות" value={detail.totals.activityEvents.toLocaleString()} />
             <Stat label="סשנים של למידה" value={detail.totals.learningSessions.toLocaleString()} />
             <Stat label="זמן למידה" value={formatSeconds(detail.totals.learningSeconds)} />

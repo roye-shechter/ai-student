@@ -5,7 +5,8 @@ import { Loader2, AlertCircle, Cpu } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { readJson } from "@/lib/http"
-import { formatDayLabel, formatDayLong, formatDateTimeSeconds, formatIls, formatTokens, ROUTE_LABELS, USD_TO_ILS } from "@/lib/admin-time"
+import { formatDayLabel, formatDayLong, formatDateTimeSeconds, formatIls, formatTokens, ROUTE_LABELS } from "@/lib/admin-time"
+import { useUsdToIlsRate } from "@/lib/use-exchange-rate"
 import { AdminRecordsDialog, type RecordFilters, type RecordKind } from "@/components/admin-records-dialog"
 
 type Drill = { kind: RecordKind; filters: RecordFilters; title: string }
@@ -59,6 +60,7 @@ export function AdminModelUsage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [drill, setDrill] = useState<Drill | null>(null)
+  const rate = useUsdToIlsRate()
 
   useEffect(() => {
     let cancelled = false
@@ -123,9 +125,9 @@ export function AdminModelUsage() {
         >
           <CardContent className="p-5">
             <div className="text-xs text-neutral-400">סה״כ עלות מוערכת</div>
-            <div className="text-2xl font-semibold text-[#ffb066] tabular-nums">{formatIls(data.totals.costUsd)}</div>
+            <div className="text-2xl font-semibold text-[#ffb066] tabular-nums">{formatIls(data.totals.costUsd, rate)}</div>
             <div className="text-[11px] text-neutral-500 mt-1">
-              מחושבת מספירת טוקנים לפי מחירון הספקים (בדולרים), והומרה לשקלים לפי שער של ₪{USD_TO_ILS} לדולר. הספקים לא מחזירים עלות דרך ה-API, לכן זו הערכה ולא חשבונית.
+              מחושבת מספירת טוקנים לפי מחירון הספקים (בדולרים), והומרה לשקלים לפי שער חליפין עדכני (₪{rate.toFixed(3)} לדולר, מתעדכן מדי כמה שעות). הספקים לא מחזירים עלות דרך ה-API, לכן זו הערכה ולא חשבונית.
             </div>
           </CardContent>
         </Card>
@@ -167,11 +169,11 @@ export function AdminModelUsage() {
               <BarChart data={data.dailyCost}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#242b3a" />
                 <XAxis dataKey="date" tick={{ fill: "#8b93a3", fontSize: 11 }} tickFormatter={formatDayLabel} minTickGap={12} />
-                <YAxis tick={{ fill: "#8b93a3", fontSize: 11 }} tickFormatter={(v: number) => `₪${(v * USD_TO_ILS).toFixed(2)}`} />
+                <YAxis tick={{ fill: "#8b93a3", fontSize: 11 }} tickFormatter={(v: number) => `₪${(v * rate).toFixed(2)}`} />
                 <Tooltip
                   contentStyle={{ background: "#12161f", border: "1px solid #242b3a", color: "#f5f6f8" }}
                   labelFormatter={(d) => formatDayLong(String(d))}
-                  formatter={(value) => formatIls(Number(value))}
+                  formatter={(value) => formatIls(Number(value), rate)}
                 />
                 <Bar dataKey="costUsd" fill="#ff7a3d" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -191,13 +193,13 @@ export function AdminModelUsage() {
                   <tr key={d.date} className="border-b border-[#242b3a]/50">
                     <td className="py-2">{formatDayLong(d.date)}</td>
                     <td className="py-2 tabular-nums">{d.calls.toLocaleString()}</td>
-                    <td className="py-2 tabular-nums">{formatIls(d.costUsd)}</td>
+                    <td className="py-2 tabular-nums">{formatIls(d.costUsd, rate)}</td>
                   </tr>
                 ))}
                 <tr className="text-[#ffb066]">
                   <td className="py-2 font-medium">סה״כ {days} ימים</td>
                   <td className="py-2 tabular-nums font-medium">{rangeCalls.toLocaleString()}</td>
-                  <td className="py-2 tabular-nums font-medium">{formatIls(rangeCost)}</td>
+                  <td className="py-2 tabular-nums font-medium">{formatIls(rangeCost, rate)}</td>
                 </tr>
               </tbody>
             </table>
@@ -235,7 +237,7 @@ export function AdminModelUsage() {
                   <td className="py-2 tabular-nums">{m.calls.toLocaleString()}</td>
                   <td className="py-2 tabular-nums">{formatTokens(m.inputTokens)}</td>
                   <td className="py-2 tabular-nums">{formatTokens(m.outputTokens)}</td>
-                  <td className="py-2 tabular-nums">{formatIls(m.costUsd)}</td>
+                  <td className="py-2 tabular-nums">{formatIls(m.costUsd, rate)}</td>
                   <td className="py-2 tabular-nums">{m.avgLatencyMs.toLocaleString()} ms</td>
                   <td className="py-2 tabular-nums">{m.failures} / {m.fallbacks}</td>
                 </tr>
@@ -285,7 +287,7 @@ export function AdminModelUsage() {
                   <td className="py-2 pl-4 font-mono text-xs text-[#ffb066]">{c.model}</td>
                   <td className="py-2 pl-4 text-neutral-300">{ROUTE_LABELS[c.route] ?? c.route}</td>
                   <td className="py-2 pl-4 tabular-nums">{formatTokens(c.inputTokens)} / {formatTokens(c.outputTokens)}</td>
-                  <td className="py-2 pl-4 tabular-nums">{formatIls(c.costUsd)}</td>
+                  <td className="py-2 pl-4 tabular-nums">{formatIls(c.costUsd, rate)}</td>
                   <td className="py-2 pl-4 tabular-nums">{c.latencyMs.toLocaleString()} ms</td>
                   <td className="py-2 text-xs">
                     {c.ok ? (
@@ -329,7 +331,7 @@ export function AdminModelUsage() {
                 >
                   <td className="py-2">{ROUTE_LABELS[r.route] ?? r.route}</td>
                   <td className="py-2 tabular-nums">{r.calls.toLocaleString()}</td>
-                  <td className="py-2 tabular-nums">{formatIls(r.costUsd)}</td>
+                  <td className="py-2 tabular-nums">{formatIls(r.costUsd, rate)}</td>
                 </tr>
               ))}
             </tbody>
@@ -361,7 +363,7 @@ export function AdminModelUsage() {
                   <td className="py-2">{row.fullName ?? row.username}</td>
                   <td className="py-2 font-mono text-xs text-neutral-300">{row.model}</td>
                   <td className="py-2 tabular-nums">{row.calls.toLocaleString()}</td>
-                  <td className="py-2 tabular-nums">{formatIls(row.costUsd)}</td>
+                  <td className="py-2 tabular-nums">{formatIls(row.costUsd, rate)}</td>
                 </tr>
               ))}
               {data.perUser.length === 0 && (

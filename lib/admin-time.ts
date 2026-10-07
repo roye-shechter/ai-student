@@ -42,16 +42,19 @@ export function formatDayLong(dayKey: string): string {
 }
 
 /**
- * Dollar-to-shekel rate for the cost figures. Providers bill in USD, so the
- * panel converts at this fixed rate. Update it when the shekel moves enough
- * to matter; the cost numbers are estimates either way.
+ * Dollar-to-shekel rate used before the live rate has loaded, or if
+ * lib/exchange-rate.ts's fetch fails. The admin UI normally uses the live
+ * rate (see lib/use-exchange-rate.ts's useUsdToIlsRate hook) — this is only
+ * the safety net, not what's actually shown day to day.
  */
-export const USD_TO_ILS = 3.7
+export const FALLBACK_USD_TO_ILS = 3.7
 
-/** Cost in shekels, e.g. "₪0.55". Pass null when the call had no token usage. */
-export function formatIls(usd: number | null): string {
+/** Cost in shekels, e.g. "₪0.55". Pass null when the call had no token usage.
+ * `rate` defaults to the fixed fallback — pass the live rate from
+ * useUsdToIlsRate() wherever one is available. */
+export function formatIls(usd: number | null, rate: number = FALLBACK_USD_TO_ILS): string {
   if (usd === null) return "—"
-  const ils = usd * USD_TO_ILS
+  const ils = usd * rate
   if (ils === 0) return "₪0"
   return ils < 0.01 ? `₪${ils.toFixed(4)}` : `₪${ils.toFixed(2)}`
 }

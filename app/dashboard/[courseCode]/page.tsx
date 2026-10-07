@@ -379,8 +379,8 @@ export default function CoursePage() {
   const courseTitle = course?.courseName ?? courseCode
 
   return (
-    <div ref={rootRef} className="relative z-10 min-h-screen text-white flex flex-col" dir="rtl">
-      <div className="course-header border-b border-[#242b3a] glass-panel p-4">
+    <div ref={rootRef} className="relative z-10 min-h-screen lg:h-screen lg:overflow-hidden text-white flex flex-col" dir="rtl">
+      <div className="course-header border-b border-[#242b3a] glass-panel p-4 shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 text-neutral-400 hover:text-[#ffb066] transition-colors text-sm">
             <ArrowRight size={16} />
@@ -390,7 +390,14 @@ export default function CoursePage() {
         </div>
       </div>
 
-      <div className={`flex-1 w-full mx-auto flex flex-col lg:flex-row gap-6 p-6 ${fullscreen ? "max-w-none" : "max-w-7xl"}`}>
+      {/* lg:min-h-0 lets this row actually shrink to fit inside the h-screen
+          root above instead of growing past it — without it, flexbox's
+          default min-height:auto keeps the row (and everything below the
+          fold, like the chat input) exactly as tall as its content wants,
+          which is what was clipping the bottom of the chat card off-screen
+          with no way to scroll to it. Mobile keeps natural page scroll
+          (no lg:h-screen on the root), so this only changes desktop. */}
+      <div className={`flex-1 lg:min-h-0 w-full mx-auto flex flex-col lg:flex-row gap-6 p-6 ${fullscreen ? "max-w-none" : "max-w-7xl"}`}>
 
         {/* חלק ימין: חומרי לימוד, מועדי בחינות, התקדמות — מועלם במסך מלא */}
         {!fullscreen && (
@@ -470,7 +477,7 @@ export default function CoursePage() {
         )}
 
         {/* חלק שמאל: הצ'אט האמיתי */}
-        <Card className="course-chat-card glass-panel border-[#242b3a] text-white flex-1 min-w-0 flex flex-col h-[calc(100vh-140px)] shadow-2xl shadow-black/30">
+        <Card className="course-chat-card glass-panel border-[#242b3a] text-white flex-1 min-w-0 flex flex-col h-[calc(100dvh-140px)] lg:h-full shadow-2xl shadow-black/30">
           <CardHeader className="border-b border-[#242b3a] pb-4 flex flex-row items-start justify-between">
             <div>
               <CardTitle className="text-lg text-white flex items-center gap-2">
@@ -613,7 +620,7 @@ export default function CoursePage() {
 
         {/* הלוח החי: נוסחאות ותרשימים שהמורה "משרבט" בזמן ההסבר */}
         {!fullscreen && boardOpen && (
-          <div className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-[calc(100vh-140px)]">
+          <div className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-full">
             <TutorBoard content={assistantTranscript} onClose={() => setBoardOpen(false)} />
           </div>
         )}
