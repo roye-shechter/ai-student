@@ -42,14 +42,39 @@ type RecentCall = {
 
 type DayRange = 7 | 14 | 30
 
+type SessionRow = {
+  id: string
+  userId: string
+  username: string
+  fullName: string | null
+  courseCode: string
+  courseName: string
+  activityType: string | null
+  sessionStart: string
+  sessionEnd: string
+  durationMinutes: number
+  calls: number
+  costUsd: number
+}
+
 type ModelUsageData = {
   days: DayRange
   totals: { calls: number; costUsd: number }
   byModel: ModelRow[]
-  byRoute: { route: string; calls: number; costUsd: number }[]
+  byRoute: { route: string; calls: number; costUsd: number; avgCostUsd: number }[]
   perUser: { userId: string; username: string; fullName: string | null; model: string; calls: number; costUsd: number }[]
   dailyCost: { date: string; costUsd: number; calls: number }[]
   recentCalls: RecentCall[]
+  bySession: SessionRow[]
+}
+
+const ACTIVITY_LABELS: Record<string, string> = { chat: "צ׳אט", quiz: "מבחן תרגול" }
+
+function formatDurationMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} דק׳`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest > 0 ? `${hours} ש׳ ${rest} דק׳` : `${hours} ש׳`
 }
 
 const DAY_RANGES: DayRange[] = [7, 14, 30]
@@ -314,12 +339,16 @@ export function AdminModelUsage() {
           <CardTitle className="text-[#ffb066] font-sans text-sm font-medium">שימוש לפי סוג שאלה (ניתוב)</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
+          <p className="text-[11px] text-neutral-500 mb-2">
+            העמודה ״סה״כ עלות״ היא סכום כל הקריאות מהסוג הזה בטווח שנבחר — לא המחיר של שאלה אחת. לעלות שאלה בודדת ראה את העמודה ״ממוצע לשאלה״.
+          </p>
           <table className="w-full text-sm">
             <thead className="text-neutral-400 text-xs">
               <tr className="border-b border-[#242b3a]">
                 <th className="text-right py-2 font-normal">סוג</th>
                 <th className="text-right py-2 font-normal">קריאות</th>
-                <th className="text-right py-2 font-normal">עלות מוערכת</th>
+                <th className="text-right py-2 font-normal">סה״כ עלות</th>
+                <th className="text-right py-2 font-normal">ממוצע לשאלה</th>
               </tr>
             </thead>
             <tbody>
@@ -332,8 +361,55 @@ export function AdminModelUsage() {
                   <td className="py-2">{ROUTE_LABELS[r.route] ?? r.route}</td>
                   <td className="py-2 tabular-nums">{r.calls.toLocaleString()}</td>
                   <td className="py-2 tabular-nums">{formatIls(r.costUsd, rate)}</td>
+                  <td className="py-2 tabular-nums text-[#ffb066]">{formatIls(r.avgCostUsd, rate)}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel border-[#242b3a] text-white">
+        <CardHeader>
+          <CardTitle className="text-[#ffb066] font-sans text-sm font-medium">עלות משוערת לפי סשן למידה</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto max-h-96 overflow-y-auto">
+          <p className="text-[11px] text-neutral-500 mb-2">
+            סשן = רצף פעילות רצוף של אותו סטודנט באותו קורס (עד 30 דקות הפסקה ביניהן נחשבות אותו סשן). העלות היא הערכה — כל קריאת מודל בטווח הזמן של הסשן, לא חיוב מדויק.
+          </p>
+          <table className="w-full text-sm whitespace-nowrap">
+            <thead className="text-neutral-400 text-xs sticky top-0 bg-[#12161f]">
+              <tr className="border-b border-[#242b3a]">
+                <th className="text-right py-2 pl-4 font-normal">התחלה</th>
+                <th className="text-right py-2 pl-4 font-normal">משתמש</th>
+                <th className="text-right py-2 pl-4 font-normal">קורס</th>
+                <th className="text-right py-2 pl-4 font-normal">סוג</th>
+                <th className="text-right py-2 pl-4 font-normal">משך</th>
+                <th className="text-right py-2 pl-4 font-normal">קריאות</th>
+                <th className="text-right py-2 font-normal">עלות משוערת</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.bySession.map((s) => (
+                <tr
+                  key={s.id}
+                  onClick={() => setDrill({ kind: "calls", filters: { userId: s.userId }, title: `קריאות — ${s.fullName ?? s.username} · ${s.courseCode}` })}
+                  className="border-b border-[#242b3a]/50 cursor-pointer hover:bg-[#161b26]/60"
+                >
+                  <td className="py-2 pl-4 tabular-nums font-mono text-xs">{formatDateTimeSeconds(s.sessionStart)}</td>
+                  <td className="py-2 pl-4">{s.fullName ?? s.username}</td>
+                  <td className="py-2 pl-4 text-neutral-300">{s.courseCode}</td>
+                  <td className="py-2 pl-4 text-neutral-300">{ACTIVITY_LABELS[s.activityType ?? ""] ?? s.activityType ?? "—"}</td>
+                  <td className="py-2 pl-4 tabular-nums">{formatDurationMinutes(s.durationMinutes)}</td>
+                  <td className="py-2 pl-4 tabular-nums">{s.calls.toLocaleString()}</td>
+                  <td className="py-2 tabular-nums text-[#ffb066]">{formatIls(s.costUsd, rate)}</td>
+                </tr>
+              ))}
+              {data.bySession.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-4 text-center text-neutral-500">עדיין אין סשנים מתועדים בטווח הזה</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </CardContent>
