@@ -35,6 +35,25 @@ export function MarkdownMessage({ content }: { content: string }) {
           blockquote: ({ children }) => (
             <blockquote className="border-r-2 border-[#ff7a3d]/50 pr-3 text-neutral-300 italic">{children}</blockquote>
           ),
+          // Bare <table> with no width/overflow handling breaks down in a
+          // narrow RTL chat column: cells race for space and the bidi
+          // algorithm reorders their (near-zero-width) text runs into an
+          // unreadable jumble. The scrollable wrapper plus per-cell
+          // min-width/nowrap keeps every column legible, letting the table
+          // scroll horizontally instead of collapsing.
+          table: ({ children }) => (
+            <div className="mb-2 overflow-x-auto rounded-sm border border-[#242b3a]">
+              <table className="w-full border-collapse text-xs">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-[#161b26]">{children}</thead>,
+          tr: ({ children }) => <tr className="border-b border-[#242b3a] last:border-b-0">{children}</tr>,
+          th: ({ children }) => (
+            <th className="min-w-[48px] whitespace-nowrap px-2 py-1 text-right font-semibold text-[#ffb066]">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => <td className="min-w-[48px] whitespace-nowrap px-2 py-1 text-right">{children}</td>,
         }}
       >
         {content}
