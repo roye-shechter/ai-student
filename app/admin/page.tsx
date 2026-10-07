@@ -11,6 +11,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
 import { AdminModelUsage } from "@/components/admin-model-usage"
+import { formatDayLabel, formatDayLong } from "@/lib/admin-time"
+import { AdminUserDialog } from "@/components/admin-user-dialog"
+import { AdminRecordsDialog, type RecordFilters, type RecordKind } from "@/components/admin-records-dialog"
+
+type OpenRecords = { kind: RecordKind; filters: RecordFilters; title: string }
 
 type AdminIdentity = { id: string; name: string }
 
@@ -29,7 +34,7 @@ type AdminUserRow = {
   isActive7d: boolean
   totalRequests: number
   requestBreakdown: { chat: number; upload: number; quiz: number }
-  totalLearningMinutes: number
+  totalLearningSeconds: number
   lastIp: string | null
   lastUserAgent: string | null
 }
@@ -59,12 +64,9 @@ const ACTIVITY_META: Record<string, { label: string; icon: typeof LogIn }> = {
 
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diffMs / 60000)
-  if (min < 1) return "עכשיו"
-  if (min < 60) return `לפני ${min} דק'`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `לפני ${hr} שע'`
-  const day = Math.floor(hr / 24)
+  const sec = Math.max(0, Math.floor(diffMs / 1000))
+  if (sec < 86400) return sec === 0 ? "0 שניות" : `לפני ${sec.toLocaleString("he-IL")} שניות`
+  const day = Math.floor(sec / 86400)
   if (day < 30) return `לפני ${day} ימים`
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" })
 }
@@ -181,6 +183,8 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [detailUserId, setDetailUserId] = useState<string | null>(null)
+  const [openRecords, setOpenRecords] = useState<OpenRecords | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -278,13 +282,13 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={overview.dailyActivity}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#242b3a" />
-                <XAxis
-                  dataKey="date"
-                  stroke="#8b93a3"
-                  tickFormatter={(d: string) => new Date(d).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}
-                />
+                <XAxis dataKey="date" stroke="#8b93a3" tickFormatter={formatDayLabel} />
                 <YAxis stroke="#8b93a3" allowDecimals={false} domain={[0, maxCount]} />
-                <Tooltip contentStyle={{ backgroundColor: "#12161f", borderColor: "#ff7a3d", color: "#fff" }} cursor={{ fill: "#ffffff08" }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#12161f", borderColor: "#ff7a3d", color: "#fff" }}
+                  cursor={{ fill: "#ffffff08" }}
+                  labelFormatter={(d) => formatDayLong(String(d))}
+                />
                 <Bar dataKey="count" fill="#ff7a3d" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -292,6 +296,22 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
         </Card>
 
         <AdminModelUsage />
+
+        {detailUserId && (
+          <AdminUserDialog
+            userId={detailUserId}
+            onClose={() => setDetailUserId(null)}
+            onOpenRecords={(kind, filters, title) => setOpenRecords({ kind, filters, title })}
+          />
+        )}
+        {openRecords && (
+          <AdminRecordsDialog
+            kind={openRecords.kind}
+            filters={openRecords.filters}
+            title={openRecords.title}
+            onClose={() => setOpenRecords(null)}
+          />
+        )}
 
         <Card className="glass-panel border-[#242b3a] text-white">
           <CardHeader>
@@ -309,13 +329,17 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
                   <th className="py-2 pl-4 font-medium">כניסה אחרונה</th>
                   <th className="py-2 pl-4 font-medium">IP אחרון</th>
                   <th className="py-2 pl-4 font-medium">בקשות</th>
-                  <th className="py-2 pl-4 font-medium">דק׳ למידה</th>
+                  <th className="py-2 pl-4 font-medium">שניות למידה</th>
                   <th className="py-2 font-medium">פעיל</th>
                 </tr>
               </thead>
               <tbody>
                 {overview.users.map((u) => (
-                  <tr key={u.id} className="border-b border-[#161b26] text-neutral-300">
+                  <tr
+                    key={u.id}
+                    onClick={() => setDetailUserId(u.id)}
+                    className="border-b border-[#161b26] text-neutral-300 cursor-pointer hover:bg-[#161b26]/60"
+                  >
                     <td className="py-2.5 pl-4">
                       <div className="text-white">{u.fullName ?? u.username}</div>
                       <div className="text-[11px] text-neutral-500">{u.email}</div>
@@ -330,7 +354,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
                     <td className="py-2.5 pl-4 text-xs" title={`צ׳אט ${u.requestBreakdown.chat} · העלאות ${u.requestBreakdown.upload} · מבחנים ${u.requestBreakdown.quiz}`}>
                       {u.totalRequests}
                     </td>
-                    <td className="py-2.5 pl-4 text-xs">{u.totalLearningMinutes}</td>
+                    <td className="py-2.5 pl-4 text-xs tabular-nums">{u.totalLearningSeconds.toLocaleString("he-IL")}</td>
                     <td className="py-2.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${u.isActive7d ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/50" : "bg-[#161b26] text-neutral-500 border border-[#242b3a]"}`}>
                         {u.isActive7d ? "פעיל" : "לא פעיל"}
@@ -347,6 +371,13 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
           <CardHeader>
             <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
               <Activity size={16} /> פעילות אחרונה
+              <button
+                type="button"
+                onClick={() => setOpenRecords({ kind: "activity", filters: {}, title: "פעילות במערכת" })}
+                className="mr-auto text-xs text-neutral-400 hover:text-white underline underline-offset-4"
+              >
+                כל הפעילות
+              </button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
+import { israelDayKey, recentDayKeys } from "@/lib/admin-time"
 
 const ACTIVE_WINDOW_DAYS = 7
 const CHART_DAYS = 14
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
  * Everything the admin dashboard's main view needs in one call: account
@@ -16,7 +18,8 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const activeSince = new Date(Date.now() - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-  const chartSince = new Date(Date.now() - CHART_DAYS * 24 * 60 * 60 * 1000)
+  // One extra day of margin so the first Israel-time bucket is fully covered.
+  const chartSince = new Date(Date.now() - (CHART_DAYS + 1) * DAY_MS)
 
   const [users, courseCount, documentCount, activeEventUserIds, activeUsageUserIds, usageByUser, learningByUser, lastLogins, recentEvents] =
     await Promise.all([
@@ -96,21 +99,20 @@ export async function GET() {
       isActive7d: activeSet.has(u.id),
       totalRequests: (usage?.chatCount ?? 0) + (usage?.uploadCount ?? 0) + (usage?.quizCount ?? 0),
       requestBreakdown: { chat: usage?.chatCount ?? 0, upload: usage?.uploadCount ?? 0, quiz: usage?.quizCount ?? 0 },
-      totalLearningMinutes: learningMap.get(u.id) ?? 0,
+      // LearningSession stores minutes; the admin table shows seconds.
+      totalLearningSeconds: Math.round((learningMap.get(u.id) ?? 0) * 60),
       lastIp: lastLogin?.ip ?? null,
       lastUserAgent: lastLogin?.userAgent ?? null,
     }
   })
 
   // Bucket the last 14 days of events into per-day counts for the chart —
-  // done in JS rather than a DB-side date_trunc so this stays portable.
-  const dayBuckets = new Map<string, number>()
-  for (let i = CHART_DAYS - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-    dayBuckets.set(d.toISOString().slice(0, 10), 0)
-  }
+  // done in JS rather than a DB-side date_trunc so this stays portable. Days
+  // are Israel calendar days (see lib/admin-time.ts), not UTC.
+  const dayKeys = recentDayKeys(CHART_DAYS)
+  const dayBuckets = new Map(dayKeys.map((key) => [key, 0]))
   for (const event of recentEvents) {
-    const key = event.createdAt.toISOString().slice(0, 10)
+    const key = israelDayKey(event.createdAt)
     if (dayBuckets.has(key)) dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + 1)
   }
   const dailyActivity = [...dayBuckets.entries()].map(([date, count]) => ({ date, count }))

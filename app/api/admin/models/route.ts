@@ -1,22 +1,30 @@
 import { NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
+import { israelDayKey, recentDayKeys } from "@/lib/admin-time"
 
-const CHART_DAYS = 14
+const DAY_RANGES = [7, 14, 30] as const
+const DEFAULT_DAY_RANGE = 14
+const DAY_MS = 24 * 60 * 60 * 1000
 const TOP_USER_ROWS = 200
+const RECENT_CALL_ROWS = 100
 
 /**
  * Per-model LLM usage and cost for the admin dashboard. Aggregates in the
  * database (groupBy) rather than loading every row, so it stays cheap as the
- * ModelUsageEvent table grows.
+ * ModelUsageEvent table grows. `?days=7|14|30` picks the daily-cost range.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const chartSince = new Date(Date.now() - CHART_DAYS * 24 * 60 * 60 * 1000)
+  const requestedDays = Number(new URL(req.url).searchParams.get("days"))
+  const days = (DAY_RANGES as readonly number[]).includes(requestedDays) ? requestedDays : DEFAULT_DAY_RANGE
 
-  const [byModel, failuresByModel, fallbacksByModel, byRoute, perUser, recentDaily] = await Promise.all([
+  // One extra day of margin so the first Israel-time bucket is fully covered.
+  const rangeSince = new Date(Date.now() - (days + 1) * DAY_MS)
+
+  const [byModel, failuresByModel, fallbacksByModel, byRoute, perUser, rangeEvents, recentCalls] = await Promise.all([
     prisma.modelUsageEvent.groupBy({
       by: ["provider", "model"],
       _count: { _all: true },
@@ -47,8 +55,27 @@ export async function GET() {
       take: TOP_USER_ROWS,
     }),
     prisma.modelUsageEvent.findMany({
-      where: { createdAt: { gte: chartSince } },
+      where: { createdAt: { gte: rangeSince } },
       select: { createdAt: true, costUsd: true },
+    }),
+    prisma.modelUsageEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: RECENT_CALL_ROWS,
+      select: {
+        id: true,
+        createdAt: true,
+        provider: true,
+        model: true,
+        route: true,
+        feature: true,
+        inputTokens: true,
+        outputTokens: true,
+        costUsd: true,
+        latencyMs: true,
+        ok: true,
+        fallbackFrom: true,
+        user: { select: { username: true, fullName: true } },
+      },
     }),
   ])
 
@@ -64,13 +91,11 @@ export async function GET() {
     : []
   const userMap = new Map(users.map((u) => [u.id, u]))
 
-  const dayBuckets = new Map<string, { costUsd: number; calls: number }>()
-  for (let i = CHART_DAYS - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-    dayBuckets.set(d.toISOString().slice(0, 10), { costUsd: 0, calls: 0 })
-  }
-  for (const event of recentDaily) {
-    const bucket = dayBuckets.get(event.createdAt.toISOString().slice(0, 10))
+  // Day buckets are Israel calendar days, matching what the admin sees on the clock.
+  const dayKeys = recentDayKeys(days)
+  const dayBuckets = new Map(dayKeys.map((key) => [key, { costUsd: 0, calls: 0 }]))
+  for (const event of rangeEvents) {
+    const bucket = dayBuckets.get(israelDayKey(event.createdAt))
     if (bucket) {
       bucket.calls += 1
       bucket.costUsd += event.costUsd ?? 0
@@ -91,6 +116,7 @@ export async function GET() {
   }))
 
   return NextResponse.json({
+    days,
     totals: {
       calls: modelRows.reduce((sum, m) => sum + m.calls, 0),
       costUsd: modelRows.reduce((sum, m) => sum + m.costUsd, 0),
@@ -106,5 +132,20 @@ export async function GET() {
       costUsd: row._sum.costUsd ?? 0,
     })),
     dailyCost: [...dayBuckets.entries()].map(([date, v]) => ({ date, ...v })),
+    recentCalls: recentCalls.map((c) => ({
+      id: c.id,
+      createdAt: c.createdAt.toISOString(),
+      user: c.user.fullName ?? c.user.username,
+      provider: c.provider,
+      model: c.model,
+      route: c.route,
+      feature: c.feature,
+      inputTokens: c.inputTokens,
+      outputTokens: c.outputTokens,
+      costUsd: c.costUsd,
+      latencyMs: c.latencyMs,
+      ok: c.ok,
+      fallbackFrom: c.fallbackFrom,
+    })),
   })
 }
