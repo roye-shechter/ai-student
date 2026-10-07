@@ -99,8 +99,9 @@ export default function CoursePage() {
   const [showManageDialog, setShowManageDialog] = useState(false)
 
   // Fullscreen hides the materials/exam/progress sidebar entirely so the
-  // chat gets the whole width — "שכל המסך כולו יהיה צ'אט". The live board
-  // is part of "the rest" too, so it's forced closed while fullscreen.
+  // chat gets the extra width — "שכל המסך כולו יהיה צ'אט". The live board
+  // stays available and toggleable in fullscreen too, sitting beside the
+  // widened chat instead of disappearing with the sidebar.
   const [fullscreen, setFullscreen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(false)
   const boardAutoOpenedRef = useRef(false)
@@ -510,17 +511,15 @@ export default function CoursePage() {
               <CardDescription className="text-neutral-400 text-xs mt-1">שאל כל שאלה על החומר — המורה הפרטי מלמד ומסביר בהתבסס אך ורק על מסמכי הקורס שהעלית.</CardDescription>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {!fullscreen && (
-                <button
-                  type="button"
-                  onClick={() => setBoardOpen((v) => !v)}
-                  aria-label={boardOpen ? "סגור את הלוח החי" : "פתח את הלוח החי"}
-                  title="הלוח החי — נוסחאות ותרשימים"
-                  className={`p-2 rounded-sm border transition-colors ${boardOpen ? "border-[#ff7a3d]/50 bg-[#ff7a3d]/15 text-[#ffb066]" : "border-[#242b3a] text-neutral-400 hover:text-white"}`}
-                >
-                  <PenLine size={15} />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setBoardOpen((v) => !v)}
+                aria-label={boardOpen ? "סגור את הלוח החי" : "פתח את הלוח החי"}
+                title="הלוח החי — נוסחאות ותרשימים"
+                className={`p-2 rounded-sm border transition-colors ${boardOpen ? "border-[#ff7a3d]/50 bg-[#ff7a3d]/15 text-[#ffb066]" : "border-[#242b3a] text-neutral-400 hover:text-white"}`}
+              >
+                <PenLine size={15} />
+              </button>
               <button
                 type="button"
                 onClick={() => setFullscreen((v) => !v)}
@@ -641,9 +640,13 @@ export default function CoursePage() {
           </CardFooter>
         </Card>
 
-        {/* הלוח החי: נוסחאות ותרשימים שהמורה "משרבט" בזמן ההסבר */}
-        {!fullscreen && boardOpen && (
-          <div ref={boardPanelRef} className="w-full lg:w-[360px] shrink-0 h-[420px] lg:h-full">
+        {/* הלוח החי: נוסחאות ותרשימים שהמורה "משרבט" בזמן ההסבר — נשאר
+            זמין גם במסך הרחב, מוצג לצד הצ'אט המורחב במקום להיעלם איתו. */}
+        {boardOpen && (
+          <div
+            ref={boardPanelRef}
+            className={`w-full shrink-0 h-[420px] lg:h-full ${fullscreen ? "lg:w-[420px]" : "lg:w-[360px]"}`}
+          >
             <TutorBoard content={assistantTranscript} onClose={() => setBoardOpen(false)} />
           </div>
         )}
