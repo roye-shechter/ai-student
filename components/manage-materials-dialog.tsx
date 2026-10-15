@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FileText, FileAudio, X, Pencil, Trash2, Check, Loader2, UploadCloud } from "lucide-react"
+import { FileText, FileAudio, FileImage, X, Pencil, Trash2, Check, Loader2, UploadCloud } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { StatusBadge } from "@/components/document-status-badge"
 import { readJson } from "@/lib/http"
@@ -145,7 +145,7 @@ export function ManageMaterialsDialog({
           {uploadStatus && !isUploading ? (
             <p className="text-xs text-red-400 text-center mt-2">{uploadStatus}</p>
           ) : (
-            <p className="text-[11px] text-neutral-500 text-center mt-2">PDF, TXT או הקלטת שיעור</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-2">PDF, TXT, תמונה (גם סריקה/צילום) או הקלטת שיעור</p>
           )}
         </div>
 
@@ -160,6 +160,8 @@ export function ManageMaterialsDialog({
               >
                 {doc.fileType === "audio" ? (
                   <FileAudio size={18} className="text-[#ffb066] shrink-0" />
+                ) : doc.fileType === "image" ? (
+                  <FileImage size={18} className="text-[#ffb066] shrink-0" />
                 ) : (
                   <FileText size={18} className="text-[#ffb066] shrink-0" />
                 )}

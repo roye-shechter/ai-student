@@ -7,7 +7,7 @@ import { ingestDocument } from "@/lib/rag/ingest"
 import { assertEmbeddingEnv } from "@/lib/rag/clients"
 import { transcribeAudio } from "@/lib/rag/transcribe"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
-import { isPdf, isTxt, isAudio, extractPdfText } from "@/lib/rag/extract-text"
+import { isPdf, isTxt, isAudio, isImage, extractPdfText, extractViaOcr } from "@/lib/rag/extract-text"
 import { logActivity } from "@/lib/activity-log"
 
 /**
@@ -16,8 +16,10 @@ import { logActivity } from "@/lib/activity-log"
  * The browser has already PUT the raw file straight to Vercel Blob (see
  * app/api/upload/token/route.ts); this route only ever receives a small JSON
  * body naming that blob. It downloads the file server-side, extracts text
- * (transcribing audio via lib/rag/transcribe.ts when applicable), records a
- * Document row, and responds immediately with status "pending" — the actual
+ * (transcribing audio via lib/rag/transcribe.ts, or OCR'ing a photo/scanned
+ * PDF via lib/rag/extract-text.ts's extractViaOcr() when there's no text
+ * layer to read directly), records a Document row, and responds immediately
+ * with status "pending" — the actual
  * chunk/embed/upsert work (lib/rag/ingest.ts) runs afterwards via after(),
  * so a large document's processing time is never blocking the client's
  * request nor gated by a short synchronous timeout. The blob is deleted once
@@ -104,10 +106,11 @@ export async function POST(req: Request) {
     const audio = isAudio(fileName, contentType)
     const pdf = isPdf(fileName, contentType)
     const txt = isTxt(fileName, contentType)
-    if (!pdf && !txt && !audio) {
+    const image = isImage(fileName, contentType)
+    if (!pdf && !txt && !audio && !image) {
       await del(blobUrl).catch(() => {})
       return NextResponse.json(
-        { error: "Unsupported file type (PDF, TXT, or an audio lecture recording)" },
+        { error: "סוג קובץ לא נתמך (PDF, TXT, תמונה או הקלטת שיעור)" },
         { status: 415 }
       )
     }
@@ -130,14 +133,25 @@ export async function POST(req: Request) {
     try {
       if (audio) {
         text = await transcribeAudio(new File([bytes], fileName, { type: contentType }))
+      } else if (image) {
+        // No text layer to try first — a photo is OCR'd straight away.
+        text = await extractViaOcr(bytes, contentType || "image/jpeg")
+      } else if (pdf) {
+        text = await extractPdfText(bytes)
+        if (!text.trim()) {
+          // No text layer at all (a scanned/photographed PDF) — fall back to
+          // the same Gemini OCR path used for direct photo uploads instead
+          // of failing outright.
+          text = await extractViaOcr(bytes, "application/pdf")
+        }
       } else {
-        text = pdf ? await extractPdfText(bytes) : new TextDecoder("utf-8").decode(bytes)
+        text = new TextDecoder("utf-8").decode(bytes)
       }
     } catch (error) {
       console.error(audio ? "Audio transcription failed:" : "Text extraction failed:", error)
       await del(blobUrl).catch(() => {})
       return NextResponse.json(
-        { error: audio ? "תמלול ההקלטה נכשל" : "Failed to read the document" },
+        { error: audio ? "תמלול ההקלטה נכשל" : "קריאת המסמך נכשלה" },
         { status: 422 }
       )
     }
@@ -145,16 +159,12 @@ export async function POST(req: Request) {
     if (!text.trim()) {
       await del(blobUrl).catch(() => {})
       return NextResponse.json(
-        {
-          error: audio
-            ? "לא זוהה דיבור בהקלטה"
-            : "No extractable text found (scanned/image-only PDFs are not supported)",
-        },
+        { error: audio ? "לא זוהה דיבור בהקלטה" : "לא זוהה טקסט קריא במסמך" },
         { status: 422 }
       )
     }
 
-    const fileType = audio ? "audio" : pdf ? "pdf" : "txt"
+    const fileType = audio ? "audio" : pdf ? "pdf" : image ? "image" : "txt"
     const document = await prisma.document.create({
       data: {
         userId,

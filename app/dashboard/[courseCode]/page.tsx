@@ -432,7 +432,7 @@ export default function CoursePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.txt,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,audio/*,video/mp4,video/webm"
+              accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,image/jpeg,image/png,image/webp,audio/*,video/mp4,video/webm"
               onChange={onFileSelected}
               className="hidden"
               disabled={isUploading}

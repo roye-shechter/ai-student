@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client"
 import { authOptions } from "@/lib/auth"
-import { PDF_TYPES, TXT_TYPES, AUDIO_TYPES } from "@/lib/rag/extract-text"
+import { PDF_TYPES, TXT_TYPES, AUDIO_TYPES, IMAGE_TYPES } from "@/lib/rag/extract-text"
 
 /**
  * Issues a short-lived client upload token for Vercel Blob. The file's raw
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
           throw new Error("Unauthorized")
         }
         return {
-          allowedContentTypes: [...PDF_TYPES, ...TXT_TYPES, ...AUDIO_TYPES],
+          allowedContentTypes: [...PDF_TYPES, ...TXT_TYPES, ...AUDIO_TYPES, ...IMAGE_TYPES],
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({ userId }),
         }
