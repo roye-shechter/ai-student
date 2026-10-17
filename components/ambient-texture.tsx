@@ -9,6 +9,15 @@
  * pre-generated offline with a seeded RNG (not computed at runtime) so it's
  * fixed and never shifts between loads. Server component: the animation is
  * pure CSS, so this still costs nothing at runtime.
+ *
+ * The three glow blur() radii below were trimmed down (was 110/60/55px) —
+ * large stacked CSS blurs are GPU/memory-heavy on iOS Safari specifically,
+ * a documented WebKit crash class (bugs.webkit.org/show_bug.cgi?id=231607)
+ * that gets worse the more blurred layers are on screen at once — this
+ * renders on every page, under every .glass-panel's own backdrop-filter on
+ * top, so it's the single biggest lever here. See globals.css for the
+ * matching `pointer: coarse` rule that stops the continuous SVG animations
+ * below on touch devices (same mechanism as prefers-reduced-motion).
  */
 
 // prettier-ignore
@@ -56,7 +65,7 @@ export function AmbientTexture() {
       {/* A small dim, cool-toned "moon" off to one side — a quiet depth
           cue so the canvas doesn't read as one flat plane. */}
       <div
-        className="absolute left-[8%] top-[9%] h-[150px] w-[150px] rounded-full opacity-[0.3] blur-[55px]"
+        className="absolute left-[8%] top-[9%] h-[150px] w-[150px] rounded-full opacity-[0.3] blur-[40px]"
         style={{ background: "radial-gradient(circle, rgba(64,76,102,0.55), transparent 70%)" }}
       />
 
@@ -71,13 +80,13 @@ export function AmbientTexture() {
       {/* The glow: a soft amber light source — the visual anchor that
           keeps a dark page from reading as flat or empty. */}
       <div
-        className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 rounded-full opacity-[0.35] blur-[110px]"
+        className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 rounded-full opacity-[0.35] blur-[80px]"
         style={{
           background: "radial-gradient(ellipse 60% 55% at 50% 50%, #ff8a3d, #e0561a 45%, transparent 75%)",
         }}
       />
       <div
-        className="absolute left-1/2 top-[-6%] h-[220px] w-[420px] -translate-x-1/2 rounded-full opacity-[0.4] blur-[60px]"
+        className="absolute left-1/2 top-[-6%] h-[220px] w-[420px] -translate-x-1/2 rounded-full opacity-[0.4] blur-[45px]"
         style={{
           background: "radial-gradient(ellipse 60% 55% at 50% 50%, #ffb066, transparent 70%)",
         }}

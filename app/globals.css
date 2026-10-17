@@ -155,10 +155,14 @@
   the fallback below restores visibility if JS never runs.
 */
 @layer utilities {
+  /* blur(8px), not 12 — backdrop-filter is GPU-heavy, and this class is
+     used ~40 times across the app; several instances are often on screen
+     at once stacked over ambient-texture.tsx's own blurred glows. See the
+     note there on the iOS Safari crash class this contributes to. */
   .glass-panel {
     background: rgba(18, 22, 31, 0.72);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .gold-text {
@@ -317,6 +321,23 @@
     transform: none !important;
   }
   .tutor-avatar-ring,
+  .ambient-node,
+  .ambient-signal,
+  .ambient-ring,
+  .ambient-streak {
+    animation: none !important;
+  }
+}
+
+/* Touch devices (phones/tablets — effectively every reported-crashing
+   Safari device) are the ones with the least GPU/memory headroom for
+   sustained blur compositing (see the note on ambient-texture.tsx's glow
+   blur radii). These four elements animate forever, every page, under
+   every .glass-panel's own backdrop-filter — stopping them here removes
+   that ongoing cost on exactly the devices that can't afford it, while
+   leaving the full effect on desktop. Same mechanism as the
+   prefers-reduced-motion block above, different trigger. */
+@media (pointer: coarse) {
   .ambient-node,
   .ambient-signal,
   .ambient-ring,
