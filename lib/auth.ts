@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logActivity, extractIp, extractUserAgent } from "@/lib/activity-log"
+import { isLoginBlocked, recordFailedLogin } from "@/lib/login-rate-limit"
 
 // Validation schemas
 const loginSchema = z.object({
@@ -35,6 +36,22 @@ export const authOptions: NextAuthOptions = {
           // Validate input
           const { username, password } = loginSchema.parse(credentials)
 
+          const headers = (req?.headers ?? {}) as Record<string, string | string[] | undefined>
+          // Falls back to a shared bucket when the IP can't be determined
+          // (e.g. local dev) rather than skipping the rate limit entirely.
+          const rateLimitKey = extractIp(headers) ?? "unknown"
+
+          // Brute-force gate — checked before any DB lookup or bcrypt compare
+          // (bcrypt is deliberately slow; skipping it when already blocked
+          // saves real server cost, not just a formality). The error message
+          // is intentionally identical to a genuine wrong-password error:
+          // NextAuth's CredentialsProvider collapses every thrown error to
+          // the same "CredentialsSignin" code anyway, and not revealing
+          // "you've been rate-limited" to a caller is the safer default.
+          if (await isLoginBlocked(rateLimitKey)) {
+            throw new Error("Invalid credentials")
+          }
+
           // Find user by username or email
           const user = await prisma.user.findFirst({
             where: {
@@ -46,6 +63,7 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!user || !user.passwordHash) {
+            await recordFailedLogin(rateLimitKey)
             throw new Error("Invalid credentials")
           }
 
@@ -53,6 +71,7 @@ export const authOptions: NextAuthOptions = {
           const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
 
           if (!isPasswordValid) {
+            await recordFailedLogin(rateLimitKey)
             throw new Error("Invalid credentials")
           }
 
@@ -68,7 +87,6 @@ export const authOptions: NextAuthOptions = {
           // would silently drop an un-awaited write. req.headers here is a
           // plain object, not a Headers instance, in next-auth v4's
           // CredentialsProvider. logActivity itself never throws.
-          const headers = (req?.headers ?? {}) as Record<string, string | string[] | undefined>
           await logActivity({
             userId: user.id,
             type: "login",

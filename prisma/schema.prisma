@@ -255,6 +255,22 @@ model UsageCounter {
   @@map("usage_counters")
 }
 
+// One row per FAILED login attempt, keyed by client IP — brute-force
+// protection for the credentials provider (see lib/login-rate-limit.ts,
+// used from lib/auth.ts's authorize()). Deliberately separate from
+// ActivityEvent below: that table is a coarse admin-facing audit log
+// (successful logins only, pruned every 90 days), while this one is a
+// tight security control that needs minute-level granularity and gets
+// pruned far more aggressively since only the last ~15 minutes matter.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+  @@map("login_attempts")
+}
+
 // Coarse activity/audit log for the admin dashboard (app/admin) — logs
 // meaningful milestones only (login, course created, document uploaded,
 // quiz completed), NOT every chat message/request (those stay aggregated
