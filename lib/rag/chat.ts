@@ -257,9 +257,11 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
       signal,
     })
 
-    if ((route === "hard" || route === "visual") && answer && !signal?.aborted) {
+    if ((route === "hard" || route === "hard-light" || route === "visual") && answer && !signal?.aborted) {
       const reviewer: ModelTarget =
-        route === "hard" ? { provider: "gemini", model: GEMINI_VERIFIER_MODEL } : { provider: "anthropic", model: CHAT_MODEL }
+        route === "hard" || route === "hard-light"
+          ? { provider: "gemini", model: GEMINI_VERIFIER_MODEL }
+          : { provider: "anthropic", model: CHAT_MODEL }
       const started = Date.now()
       let verdict: Verdict | null = null
       try {
@@ -355,7 +357,7 @@ async function* answerWithFallback(args: {
     armTimer()
 
     try {
-      const verifiedMath = route === "hard" && target.provider === "anthropic"
+      const verifiedMath = (route === "hard" || route === "hard-light") && target.provider === "anthropic"
       for await (const part of streamModel({
         target,
         system,

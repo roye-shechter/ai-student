@@ -27,10 +27,16 @@ test("an attached image always routes to the visual model", () => {
   assert.equal(chooseRoute("חשב את ההתנגדות שקולה", { hasImage: true }), "visual")
 })
 
-test("hard math/EE questions route to the hard path", () => {
+test("named multi-step/symbolic math questions route to the hard (Opus) path", () => {
   assert.equal(chooseRoute("פתור את המשוואה 2x + 3 = 11", { hasImage: false }), "hard")
   assert.equal(chooseRoute("מהי הנגזרת של x^2 sin(x)?", { hasImage: false }), "hard")
   assert.equal(chooseRoute("חשב את הזרם כאשר R=10 ו-V=230", { hasImage: false }), "hard")
+})
+
+test("bare arithmetic routes to the light hard path (Sonnet, not Opus)", () => {
+  assert.equal(chooseRoute("17% מ-250 זה כמה?", { hasImage: false }), "hard-light")
+  assert.equal(chooseRoute("3 + 5 * 2 = ?", { hasImage: false }), "hard-light")
+  assert.equal(chooseRoute("250 * 4 - 17 = ?", { hasImage: false }), "hard-light")
 })
 
 test("a short definitional question routes to the quick path", () => {
@@ -59,13 +65,19 @@ test("classifyComplexity keeps the original simple/hard split", () => {
 })
 
 test("every route has a configured target", () => {
-  for (const route of ["visual", "hard", "quick", "standard"]) {
+  for (const route of ["visual", "hard", "hard-light", "quick", "standard"]) {
     assert.ok(ROUTE_TARGETS[route].model, `missing model for ${route}`)
   }
   assert.equal(ROUTE_TARGETS.visual.provider, "gemini")
   assert.equal(ROUTE_TARGETS.quick.provider, "groq")
   assert.equal(ROUTE_TARGETS.hard.provider, "anthropic")
   assert.equal(ROUTE_TARGETS.standard.provider, "anthropic")
+})
+
+test("hard-light uses Sonnet, not Opus — that's the whole point", () => {
+  assert.equal(ROUTE_TARGETS["hard-light"].provider, "anthropic")
+  assert.equal(ROUTE_TARGETS["hard-light"].model, ROUTE_TARGETS.standard.model)
+  assert.notEqual(ROUTE_TARGETS["hard-light"].model, ROUTE_TARGETS.hard.model)
 })
 
 console.log("pricing")
