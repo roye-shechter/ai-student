@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { assertEmbeddingEnv, EMBEDDING_MODEL, getOpenAI, toVectorSql } from "./clients"
+import { assertEmbeddingEnv, EMBEDDING_MODEL, getOpenAI, toVectorSql, withTransientRetry } from "./clients"
 
 /**
  * Ingestion pipeline.
@@ -124,7 +124,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   const out: number[][] = []
   for (let i = 0; i < texts.length; i += EMBED_BATCH) {
     const batch = texts.slice(i, i + EMBED_BATCH)
-    const res = await openai.embeddings.create({ model: EMBEDDING_MODEL, input: batch })
+    const res = await withTransientRetry(() => openai.embeddings.create({ model: EMBEDDING_MODEL, input: batch }))
     for (const item of res.data) out.push(item.embedding)
   }
   return out

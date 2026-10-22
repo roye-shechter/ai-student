@@ -7,6 +7,7 @@ import {
   GEMINI_VERIFIER_MODEL,
   getOpenAI,
   toVectorSql,
+  withTransientRetry,
 } from "./clients"
 import type { TokenUsage } from "@/lib/llm/pricing"
 import {
@@ -61,7 +62,7 @@ export type ChatTurn = {
 /** Embed a single query string. */
 async function embedQuery(query: string): Promise<number[]> {
   const openai = getOpenAI()
-  const res = await openai.embeddings.create({ model: EMBEDDING_MODEL, input: query })
+  const res = await withTransientRetry(() => openai.embeddings.create({ model: EMBEDDING_MODEL, input: query }))
   return res.data[0].embedding
 }
 

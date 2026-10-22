@@ -104,6 +104,25 @@ export function toVectorSql(embedding: number[]): string {
   return toSql(embedding) as string
 }
 
+/**
+ * OpenAI (like Gemini — see lib/llm/stream.ts's openGeminiStream) returns
+ * transient 429/503 errors under load. One retry after a short delay
+ * recovers most of them. Used around embedding calls, which previously had
+ * no retry at all — a single transient error failed the whole document.
+ */
+export async function withTransientRetry<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call()
+  } catch (error) {
+    const status = (error as { status?: number }).status
+    const message = error instanceof Error ? error.message : String(error)
+    const transient = status === 429 || status === 503 || /\b(429|503)\b/.test(message)
+    if (!transient) throw error
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+    return call()
+  }
+}
+
 // =====================================================
 // Environment validation
 // =====================================================
