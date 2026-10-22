@@ -103,20 +103,33 @@ session; שער נפרד (`lib/admin-auth.ts`): בוחרים שם מתוך שת�
 `npm run dev` · `npx prisma studio`
 
 **סכימת ה-DB עברה ל-migrations אמיתיים** (2026-10-22) — יש עכשיו
-`prisma/migrations/` עם היסטוריה בייסלינית. לשינוי סכימה: `npx prisma
-migrate dev --name <תיאור>` (יוצר migration file חדש ומריץ אותו על ה-DB
-המקומי/המשותף). **אל תשתמשו יותר ב-`db push`** לשינויי סכימה — זה בדיוק מה
-שה-migrations נועדו להחליף (היסטוריה, אפשרות rollback, לא "קסם" בלי עקבות).
-פריסה לפרודקשן (`prisma migrate deploy`) עדיין דורשת אישור מפורש מהמשתמש
-כמו כל פעולה אחרת מול ה-DB.
+`prisma/migrations/` עם היסטוריה בייסלינית. **אל תשתמשו יותר ב-`db push`**
+לשינויי סכימה — זה בדיוק מה שה-migrations נועדו להחליף (היסטוריה, אפשרות
+rollback, לא "קסם" בלי עקבות). פריסה לפרודקשן (`prisma migrate deploy`)
+עדיין דורשת אישור מפורש מהמשתמש כמו כל פעולה אחרת מול ה-DB.
 
-⚠️ עמודת ה-`embedding` ב-`DocumentChunk` היא `Unsupported("vector(1536)")`,
-אז Prisma Migrate לא "רואה" אותה — אינדקס ה-HNSW עליה
-(`document_chunks_embedding_hnsw`) **כן** מתועד עכשיו כ-migration מפורש
-(`20261022080758_document_chunks_hnsw_index`) עם `CREATE INDEX CONCURRENTLY
-IF NOT EXISTS`, אז `migrate deploy` על סביבה חדשה ייצור אותו אוטומטית. אם
-בכל זאת תתווסף עוד עמודת `Unsupported` בעתיד, צריך migration ידני דומה —
-אי אפשר לסמוך על `prisma migrate dev` לזהות שינוי בעמודה כזו בעצמו.
+🔴 **אזהרה קריטית — חובה לקרוא לפני כל שינוי סכימה, קרה כבר פעמיים באותו
+יום**: עמודת ה-`embedding` ב-`DocumentChunk` היא `Unsupported("vector(1536)")`,
+אז Prisma לא "רואה" את האינדקס HNSW שעליה (`document_chunks_embedding_hnsw`)
+— והוא **מוחק אותו בפועל** בכל `migrate dev` רגיל (ראה
+`20261022090637_add_chat_weak_signal` — ה-diff האוטומטי יצר `DROP INDEX
+...hnsw` שבאמת רץ על ה-DB החי; תוקן ב-migration הבא אחריו). זה *יקרה שוב*
+בכל שינוי סכימה עתידי אם לא עוקבים אחרי הנוהל הבא:
+
+1. **לעולם לא** `npx prisma migrate dev --name X` ישירות. תמיד
+   `npx prisma migrate dev --name X --create-only` — זה רק יוצר את קובץ ה-
+   migration בלי להריץ אותו.
+2. לפתוח את ה-`migration.sql` שנוצר ולמחוק ביד כל שורת
+   `DROP INDEX "document_chunks_embedding_hnsw";` (עם ה-`-- DropIndex`
+   שמעליה) אם היא שם.
+3. רק אז להריץ בפועל: `npx prisma migrate dev` (בלי `--create-only`,
+   מריץ migrations ממתינים) או `npx prisma db execute` / להריץ את ה-SQL
+   ישירות.
+4. אחרי כל migrate — לוודא שהאינדקס עדיין קיים:
+   `SELECT indexname FROM pg_indexes WHERE tablename = 'document_chunks'`
+   (אמור לכלול `document_chunks_embedding_hnsw`). אם נעלם — ליצור מחדש:
+   `CREATE INDEX CONCURRENTLY IF NOT EXISTS document_chunks_embedding_hnsw
+   ON document_chunks USING hnsw (embedding vector_cosine_ops);`
 
 ⚠️ ה-`extensions = [vector]` ב-`datasource` וה-`previewFeatures =
 ["postgresqlExtensions"]` ב-`generator` הכרחיים ל-`db push` — בלעדיהם

@@ -44,11 +44,18 @@ function extractBoardItems(markdown: string): BoardItem[] {
  * would otherwise see twice — once (unrendered) in the chat and again,
  * properly rendered, on the board. An unclosed block (still streaming in)
  * is left alone until its closing marker arrives, matching extractBoardItems.
+ *
+ * Also strips the hidden `<!-- weak-topic: ... -->` marker the tutor
+ * appends after a confusion-signal reply (see tutor-prompt.ts section ה and
+ * lib/rag/chat.ts, which parses the same marker server-side into
+ * ChatWeakSignal before this component ever sees the text) — same "never
+ * shown to the student" contract as the board blocks above.
  */
 function stripBoardBlocks(markdown: string): string {
   return markdown
     .replace(/\$\$([\s\S]+?)\$\$/g, "")
     .replace(/```mermaid\s*\n[\s\S]+?```/g, "")
+    .replace(/<!--\s*weak-topic:[\s\S]*?-->/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()

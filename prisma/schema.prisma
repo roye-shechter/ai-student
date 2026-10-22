@@ -92,6 +92,7 @@ model User {
   usageCounters UsageCounter[]
   activityEvents ActivityEvent[]
   modelUsageEvents ModelUsageEvent[]
+  chatWeakSignals ChatWeakSignal[]
 
   @@index([email])
   @@index([username])
@@ -123,6 +124,7 @@ model Course {
   documents        Document[]
   chatSessions     ChatSession[]
   examDates        ExamDate[]
+  chatWeakSignals  ChatWeakSignal[]
 
   @@index([courseCode])
   @@index([moodleCourseId])
@@ -269,6 +271,29 @@ model LoginAttempt {
 
   @@index([ip, createdAt])
   @@map("login_attempts")
+}
+
+// A topic the student signaled real confusion about mid-chat ("לא הבנתי",
+// "שוב", "לא ברור" — see tutor-prompt.ts), tagged by the tutor itself via a
+// hidden `<!-- weak-topic: ... -->` marker stripped before the message is
+// shown (components/tutor-board.tsx's stripBoardBlocks) or persisted (see
+// lib/rag/chat.ts). Previously only QuizQuestion.isCorrect=false fed the
+// weak-topics feedback loop (getWeakTopics in chat.ts) — a topic a student
+// struggles with in conversation, without ever taking a quiz on it, left no
+// trace once that ChatSession's history aged out. This table gives chat
+// confusion the same durable, cross-session memory quiz misses already had.
+model ChatWeakSignal {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  topic     String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId, createdAt])
+  @@map("chat_weak_signals")
 }
 
 // Coarse activity/audit log for the admin dashboard (app/admin) — logs

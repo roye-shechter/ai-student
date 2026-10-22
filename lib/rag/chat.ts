@@ -128,20 +128,54 @@ export async function getRecentHistory(
 const WEAK_TOPICS_LIMIT = 5
 
 /**
- * Topics the student has gotten wrong in past quiz attempts on this course
- * (see lib/rag/quiz.ts) — this is the whole "understanding verification"
- * feedback loop: no separate recommendation engine, just surfacing quiz
- * misses back into the tutor's context so it can proactively revisit them.
+ * Topics the student has struggled with, from two sources merged by
+ * recency: quiz misses (lib/rag/quiz.ts) and chat confusion signals
+ * (ChatWeakSignal — see the model doc comment and parseWeakTopicSignal
+ * below). This is the whole "understanding verification" feedback loop: no
+ * separate recommendation engine, just surfacing past struggles back into
+ * the tutor's context so it can proactively revisit them, whether they
+ * surfaced in a formal quiz or mid-conversation.
  */
 async function getWeakTopics(userId: string, courseId: string): Promise<string[]> {
-  const rows = await prisma.quizQuestion.findMany({
-    where: { isCorrect: false, quizAttempt: { userId, courseId } },
-    select: { topic: true },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-  })
-  const topics = rows.map((r) => r.topic).filter((t): t is string => !!t && t.trim() !== "")
-  return Array.from(new Set(topics)).slice(0, WEAK_TOPICS_LIMIT)
+  const [quizRows, chatRows] = await Promise.all([
+    prisma.quizQuestion.findMany({
+      where: { isCorrect: false, quizAttempt: { userId, courseId } },
+      select: { topic: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    prisma.chatWeakSignal.findMany({
+      where: { userId, courseId },
+      select: { topic: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ])
+
+  const merged = [...quizRows, ...chatRows]
+    .filter((r): r is { topic: string; createdAt: Date } => !!r.topic && r.topic.trim() !== "")
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+  const topics: string[] = []
+  for (const row of merged) {
+    if (!topics.includes(row.topic)) topics.push(row.topic)
+    if (topics.length >= WEAK_TOPICS_LIMIT) break
+  }
+  return topics
+}
+
+const WEAK_TOPIC_MARKER = /<!--\s*weak-topic:\s*([^-][\s\S]*?)\s*-->/
+
+/** Pulls the tutor's hidden `<!-- weak-topic: ... -->` marker (if any) out of
+ * a finished answer, returning the extracted topic and the answer with the
+ * marker removed — mirrors stripBoardBlocks in components/tutor-board.tsx,
+ * which does the same removal client-side so the raw marker is never shown.
+ */
+function parseWeakTopicSignal(answer: string): { topic: string | null; cleaned: string } {
+  const match = answer.match(WEAK_TOPIC_MARKER)
+  const cleaned = answer.replace(WEAK_TOPIC_MARKER, "").trim()
+  const topic = match?.[1]?.trim() || null
+  return { topic, cleaned }
 }
 
 /** Assemble retrieved context + history + weak topics + the new question into one prompt. */
@@ -256,6 +290,18 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
       image,
       signal,
     })
+
+    // The marker was already streamed raw to the client (hidden there by
+    // stripBoardBlocks, the same way $$/```mermaid``` blocks are) — this
+    // only affects what gets verified and persisted from here on, so a past
+    // weak-topic tag never leaks into future prompt history as noise.
+    const { topic: weakTopic, cleaned } = parseWeakTopicSignal(answer)
+    answer = cleaned
+    if (weakTopic) {
+      prisma.chatWeakSignal.create({ data: { userId, courseId, topic: weakTopic } }).catch((error) => {
+        console.error("[non-fatal] failed to record chat weak-topic signal:", error)
+      })
+    }
 
     if ((route === "hard" || route === "hard-light" || route === "visual") && answer && !signal?.aborted) {
       const reviewer: ModelTarget =
