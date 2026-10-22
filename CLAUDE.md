@@ -100,9 +100,23 @@ session; שער נפרד (`lib/admin-auth.ts`): בוחרים שם מתוך שת�
 הווקטורים ב-Postgres עצמו, ראו מעלה.)
 
 ## פקודות נפוצות
-`npm run dev` · `npx prisma db push` (⚠️ **לא** `migrate dev` — אין תיקיית
-`prisma/migrations` בפרויקט; `migrate dev` עלול לנסות ליצור baseline ולאפס
-את הסכמה) · `npx prisma studio`
+`npm run dev` · `npx prisma studio`
+
+**סכימת ה-DB עברה ל-migrations אמיתיים** (2026-10-22) — יש עכשיו
+`prisma/migrations/` עם היסטוריה בייסלינית. לשינוי סכימה: `npx prisma
+migrate dev --name <תיאור>` (יוצר migration file חדש ומריץ אותו על ה-DB
+המקומי/המשותף). **אל תשתמשו יותר ב-`db push`** לשינויי סכימה — זה בדיוק מה
+שה-migrations נועדו להחליף (היסטוריה, אפשרות rollback, לא "קסם" בלי עקבות).
+פריסה לפרודקשן (`prisma migrate deploy`) עדיין דורשת אישור מפורש מהמשתמש
+כמו כל פעולה אחרת מול ה-DB.
+
+⚠️ עמודת ה-`embedding` ב-`DocumentChunk` היא `Unsupported("vector(1536)")`,
+אז Prisma Migrate לא "רואה" אותה — אינדקס ה-HNSW עליה
+(`document_chunks_embedding_hnsw`) **כן** מתועד עכשיו כ-migration מפורש
+(`20261022080758_document_chunks_hnsw_index`) עם `CREATE INDEX CONCURRENTLY
+IF NOT EXISTS`, אז `migrate deploy` על סביבה חדשה ייצור אותו אוטומטית. אם
+בכל זאת תתווסף עוד עמודת `Unsupported` בעתיד, צריך migration ידני דומה —
+אי אפשר לסמוך על `prisma migrate dev` לזהות שינוי בעמודה כזו בעצמו.
 
 ⚠️ ה-`extensions = [vector]` ב-`datasource` וה-`previewFeatures =
 ["postgresqlExtensions"]` ב-`generator` הכרחיים ל-`db push` — בלעדיהם
@@ -115,9 +129,11 @@ Prisma זורק שגיאה על עמודת ה-`embedding`. אל תסירו או�
 תחילת עבודה.
 
 ## כלים והרשאות לסוכני Claude Code בפרויקט הזה
-מותר ללא אישור נוסף: קריאה/כתיבה/עריכה של קוד, `npx prisma db push` (סביבת
-פיתוח מקומית), `npm install`, הרצת בדיקות/lint, יצירת commit מקומי.
+מותר ללא אישור נוסף: קריאה/כתיבה/עריכה של קוד, `npx prisma migrate dev`
+(יצירת/הרצת migration חדש מול ה-DB המשותף), `npm install`, הרצת בדיקות/lint,
+יצירת commit מקומי.
 
 **דורש אישור מפורש מהמשתמש בצ'אט לפני ביצוע:** `git push`, כל פעולה מול DB
-פרודקשן (Neon), `prisma migrate deploy`, מחיקת נתונים, שינוי/רוטציה של
-מפתחות API, פתיחת/עדכון PR, כל דבר שנוגע ל-Vercel deployment.
+פרודקשן (Neon) שאינה migration רגיל (שאילתות/מחיקות ידניות, תיקון נתונים),
+`prisma migrate deploy`, מחיקת נתונים, שינוי/רוטציה של מפתחות API,
+פתיחת/עדכון PR, כל דבר שנוגע ל-Vercel deployment.
