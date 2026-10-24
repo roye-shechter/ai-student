@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { gradeShortAnswers, type ShortAnswerToGrade } from "@/lib/rag/quiz"
 import { assertLlmEnv } from "@/lib/rag/clients"
 import { logActivity } from "@/lib/activity-log"
+import { recordMasteredTopic, recordWeakTopic } from "@/lib/rag/spaced-repetition"
 
 /**
  * Quiz grading endpoint. MCQ questions are graded deterministically in
@@ -121,6 +122,26 @@ export async function POST(
       ),
       { maxWait: 10_000, timeout: 30_000 }
     )
+
+    // Feed the same spaced-repetition schedule the chat confusion-signal
+    // marker writes to (lib/rag/chat.ts) — a quiz miss is due for review
+    // tomorrow, a quiz success on a topic already tracked as weak pushes its
+    // interval further out. Best-effort: never let a scheduling hiccup fail
+    // an otherwise-successful quiz submission.
+    try {
+      const topicByQuestionId = new Map(attempt.questions.map((q) => [q.id, q.topic]))
+      await Promise.all(
+        allResults.map((r) => {
+          const topic = topicByQuestionId.get(r.questionId)
+          if (!topic || !topic.trim()) return Promise.resolve()
+          return r.isCorrect
+            ? recordMasteredTopic(userId, attempt.courseId, topic)
+            : recordWeakTopic(userId, attempt.courseId, topic)
+        })
+      )
+    } catch (error) {
+      console.error("[non-fatal] failed to update topic review schedule:", error)
+    }
 
     const totalQuestions = allResults.length
     const correctAnswers = allResults.filter((r) => r.isCorrect).length

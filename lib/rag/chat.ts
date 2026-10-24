@@ -23,6 +23,7 @@ import { streamModel, type ImageInput } from "@/lib/llm/stream"
 import { buildTutorSystem } from "@/lib/llm/tutor-prompt"
 import { verifyAnswer, type Verdict } from "@/lib/llm/verify"
 import { logModelUsage } from "@/lib/llm/usage"
+import { getDueTopics, recordWeakTopic } from "./spaced-repetition"
 
 /**
  * Retrieval + routed answer pipeline.
@@ -128,40 +129,18 @@ export async function getRecentHistory(
 const WEAK_TOPICS_LIMIT = 5
 
 /**
- * Topics the student has struggled with, from two sources merged by
- * recency: quiz misses (lib/rag/quiz.ts) and chat confusion signals
- * (ChatWeakSignal — see the model doc comment and parseWeakTopicSignal
- * below). This is the whole "understanding verification" feedback loop: no
- * separate recommendation engine, just surfacing past struggles back into
- * the tutor's context so it can proactively revisit them, whether they
- * surfaced in a formal quiz or mid-conversation.
+ * Topics due for proactive review right now, per the spaced-repetition
+ * schedule (lib/rag/spaced-repetition.ts) fed by quiz misses
+ * (lib/rag/quiz.ts) and chat confusion signals (ChatWeakSignal — see
+ * parseWeakTopicSignal below). This is the whole "understanding
+ * verification" feedback loop: no separate recommendation engine, just
+ * surfacing struggles that are due back into the tutor's context so it can
+ * proactively revisit them — "due" rather than merely "recent" so the same
+ * miss isn't re-flagged every single turn, and so mastering it (a later
+ * quiz success) actually stops it from resurfacing for a while.
  */
 async function getWeakTopics(userId: string, courseId: string): Promise<string[]> {
-  const [quizRows, chatRows] = await Promise.all([
-    prisma.quizQuestion.findMany({
-      where: { isCorrect: false, quizAttempt: { userId, courseId } },
-      select: { topic: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-    prisma.chatWeakSignal.findMany({
-      where: { userId, courseId },
-      select: { topic: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-  ])
-
-  const merged = [...quizRows, ...chatRows]
-    .filter((r): r is { topic: string; createdAt: Date } => !!r.topic && r.topic.trim() !== "")
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-
-  const topics: string[] = []
-  for (const row of merged) {
-    if (!topics.includes(row.topic)) topics.push(row.topic)
-    if (topics.length >= WEAK_TOPICS_LIMIT) break
-  }
-  return topics
+  return getDueTopics(userId, courseId, WEAK_TOPICS_LIMIT)
 }
 
 const WEAK_TOPIC_MARKER = /<!--\s*weak-topic:\s*([^-][\s\S]*?)\s*-->/
@@ -301,6 +280,7 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
       prisma.chatWeakSignal.create({ data: { userId, courseId, topic: weakTopic } }).catch((error) => {
         console.error("[non-fatal] failed to record chat weak-topic signal:", error)
       })
+      recordWeakTopic(userId, courseId, weakTopic)
     }
 
     if ((route === "hard" || route === "hard-light" || route === "visual") && answer && !signal?.aborted) {

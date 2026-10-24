@@ -93,6 +93,7 @@ model User {
   activityEvents ActivityEvent[]
   modelUsageEvents ModelUsageEvent[]
   chatWeakSignals ChatWeakSignal[]
+  topicReviews TopicReview[]
 
   @@index([email])
   @@index([username])
@@ -125,6 +126,7 @@ model Course {
   chatSessions     ChatSession[]
   examDates        ExamDate[]
   chatWeakSignals  ChatWeakSignal[]
+  topicReviews     TopicReview[]
 
   @@index([courseCode])
   @@index([moodleCourseId])
@@ -294,6 +296,31 @@ model ChatWeakSignal {
 
   @@index([userId, courseId, createdAt])
   @@map("chat_weak_signals")
+}
+
+// Spaced-repetition schedule for one (student, course, topic): when this
+// topic is next due for proactive review, and how long the interval has
+// grown. Fed by quiz misses/successes and the chat confusion-signal marker
+// (ChatWeakSignal, lib/rag/chat.ts) via lib/rag/spaced-repetition.ts — those
+// stay the raw event log; this is the derived scheduling state chat.ts's
+// getWeakTopics() actually reads from (via getDueTopics()).
+model TopicReview {
+  id            String   @id @default(cuid())
+  userId        String
+  courseId      String
+  topic         String
+  intervalDays  Int      @default(1)
+  nextReviewAt  DateTime
+  lastResult    String // "weak" | "mastered"
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, topic])
+  @@index([userId, courseId, nextReviewAt])
+  @@map("topic_reviews")
 }
 
 // Coarse activity/audit log for the admin dashboard (app/admin) — logs
