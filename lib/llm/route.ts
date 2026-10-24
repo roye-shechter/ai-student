@@ -109,3 +109,18 @@ export function chooseRoute(message: string, options: { hasImage: boolean }): Ro
   }
   return "standard"
 }
+
+// Mirrors the exact phrasings tutor-prompt.ts's confusion-handling bullet
+// already names, plus a couple of close synonyms. This is a *reinforcement*
+// signal, not a replacement for the model's own judgment — the static
+// prompt still carries the general instruction for phrasings this misses;
+// this just makes the common, reliably-detectable case land with certainty
+// instead of hoping the model notices it buried in a growing system prompt.
+// Kept deterministic and cheap on purpose, same reasoning as chooseRoute's
+// own doc comment: a classifier LLM call on every turn isn't worth it for
+// something a plain regex already catches well.
+const CONFUSION_SIGNAL = /(לא הבנתי|לא מבין|עדיין לא ברור|לא ברור לי|מבולבל|תסביר שוב)/
+
+export function isConfusionSignal(message: string): boolean {
+  return CONFUSION_SIGNAL.test(message)
+}

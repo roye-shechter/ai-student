@@ -13,6 +13,7 @@ import type { TokenUsage } from "@/lib/llm/pricing"
 import {
   chooseRoute,
   FIRST_TOKEN_TIMEOUT_MS,
+  isConfusionSignal,
   ROUTE_FALLBACKS,
   ROUTE_LIMITS,
   ROUTE_TARGETS,
@@ -254,7 +255,7 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
   const target = ROUTE_TARGETS[route]
   yield { type: "sources", chunks, route, model: target.model }
 
-  const system = buildTutorSystem(userName)
+  const system = buildTutorSystem(userName, { confused: isConfusionSignal(message) })
   const prompt = buildPrompt({ chunks, history, weakTopics, query: message })
 
   let answer = ""
@@ -277,10 +278,17 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
     const { topic: weakTopic, cleaned } = parseWeakTopicSignal(answer)
     answer = cleaned
     if (weakTopic) {
-      prisma.chatWeakSignal.create({ data: { userId, courseId, topic: weakTopic } }).catch((error) => {
+      // Awaited, not fire-and-forget: on serverless this function's process
+      // can be frozen right after the response goes out (see the same note
+      // on lib/auth.ts's logActivity call), which would silently drop an
+      // un-awaited write. Both are individually non-fatal — a bookkeeping
+      // failure here must never surface as a chat error to the student.
+      try {
+        await prisma.chatWeakSignal.create({ data: { userId, courseId, topic: weakTopic } })
+      } catch (error) {
         console.error("[non-fatal] failed to record chat weak-topic signal:", error)
-      })
-      recordWeakTopic(userId, courseId, weakTopic)
+      }
+      await recordWeakTopic(userId, courseId, weakTopic)
     }
 
     if ((route === "hard" || route === "hard-light" || route === "visual") && answer && !signal?.aborted) {

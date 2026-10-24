@@ -5,7 +5,7 @@
  */
 import "dotenv/config"
 import assert from "node:assert/strict"
-import { chooseRoute, ROUTE_TARGETS, classifyComplexity } from "../lib/llm/route.ts"
+import { chooseRoute, ROUTE_TARGETS, classifyComplexity, isConfusionSignal } from "../lib/llm/route.ts"
 import { computeCostUsd, fromAnthropicUsage } from "../lib/llm/pricing.ts"
 
 let passed = 0
@@ -62,6 +62,15 @@ test("ordinary conversational questions use the standard tutor", () => {
 test("classifyComplexity keeps the original simple/hard split", () => {
   assert.equal(classifyComplexity("שלום, איך אתה?"), "simple")
   assert.equal(classifyComplexity("∫ x dx"), "hard")
+})
+
+test("isConfusionSignal detects the phrasings the prompt relies on", () => {
+  assert.equal(isConfusionSignal("לא הבנתי את זה"), true)
+  assert.equal(isConfusionSignal("אוקיי, זה עדיין לא ברור לי"), true)
+  assert.equal(isConfusionSignal("אני ממש מבולבל"), true)
+  assert.equal(isConfusionSignal("תסביר שוב בבקשה"), true)
+  assert.equal(isConfusionSignal("מה ההבדל בין AC ל-DC?"), false)
+  assert.equal(isConfusionSignal("תודה, זה היה ברור!"), false)
 })
 
 test("every route has a configured target", () => {

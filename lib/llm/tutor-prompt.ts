@@ -72,13 +72,25 @@ export type TutorSystem = {
   dynamic: string
 }
 
-export function buildTutorSystem(userName: string): TutorSystem {
+export function buildTutorSystem(userName: string, options: { confused?: boolean } = {}): TutorSystem {
+  const dynamicLines = [
+    `שם הסטודנט הוא ${userName}.`,
+    `בתחילת השיחה (כאשר עדיין אין היסטוריית שיחה) פתח תמיד בברכה אישית — לדוגמה: "שלום ${userName}," — ורק לאחר מכן ענה לגופו של עניין.`,
+  ]
+  // Set from lib/llm/route.ts's isConfusionSignal() — a reliable, cheap
+  // detection of the exact phrasings section ה already describes, repeated
+  // here in the per-request (uncached) part of the prompt so it lands with
+  // certainty on the turn it actually matters, instead of relying on the
+  // model to notice it itself inside a large, cached, mostly-irrelevant
+  // static policy block.
+  if (options.confused) {
+    dynamicLines.push(
+      "זיהוי אוטומטי: ההודעה הנוכחית של הסטודנט מאותתת בלבול מפורש. קצר את התשובה הזו באופן משמעותי, הסבר שוב במילים אחרות לגמרי עם אנלוגיה פשוטה אחת, שלב אחד בכל פעם — אל תוסיף פרטים חדשים ואל תאריך. בסוף התשובה צרף גם את השורה הנסתרת `<!-- weak-topic: ... -->` (ראה סעיף ה)."
+    )
+  }
   return {
     staticPolicy: STATIC_POLICY,
-    dynamic: [
-      `שם הסטודנט הוא ${userName}.`,
-      `בתחילת השיחה (כאשר עדיין אין היסטוריית שיחה) פתח תמיד בברכה אישית — לדוגמה: "שלום ${userName}," — ורק לאחר מכן ענה לגופו של עניין.`,
-    ].join("\n"),
+    dynamic: dynamicLines.join("\n"),
   }
 }
 
