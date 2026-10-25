@@ -118,9 +118,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Surface the actual error message rather than an opaque generic string.
-    const message =
-      error instanceof Error ? error.message : "Failed to register user"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בהרשמה. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

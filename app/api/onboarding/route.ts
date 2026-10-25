@@ -44,8 +44,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/onboarding failed:", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to complete onboarding"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בשמירת הפרטים. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

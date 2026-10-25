@@ -6,31 +6,36 @@ import { prisma } from "@/lib/prisma"
 
 /** Current user's profile + onboarding status (read live from Postgres). */
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  const userId = session?.user?.id
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        institution: true,
+        degree: true,
+        studyYear: true,
+        age: true,
+        onboardingCompleted: true,
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(user)
+  } catch (error) {
+    console.error("[CRITICAL_ERROR] GET /api/me failed:", error)
+    return NextResponse.json({ error: "אירעה שגיאה. נסה שוב מאוחר יותר." }, { status: 500 })
   }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      username: true,
-      fullName: true,
-      institution: true,
-      degree: true,
-      studyYear: true,
-      age: true,
-      onboardingCompleted: true,
-    },
-  })
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 })
-  }
-
-  return NextResponse.json(user)
 }
 
 const updateProfileSchema = z.object({
@@ -76,7 +81,6 @@ export async function PATCH(req: Request) {
     return NextResponse.json(user)
   } catch (error) {
     console.error("[CRITICAL_ERROR] PATCH /api/me failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בעדכון הפרופיל. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

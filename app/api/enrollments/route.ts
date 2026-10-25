@@ -5,28 +5,33 @@ import { prisma } from "@/lib/prisma"
 
 /** The active user's enrolled courses (drives the dynamic dashboard grid). */
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  const userId = session?.user?.id
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-  const enrollments = await prisma.enrollment.findMany({
-    where: { userId, isActive: true },
-    orderBy: { enrolledAt: "asc" },
-    select: {
-      completionPercentage: true,
-      course: {
-        select: {
-          id: true,
-          courseCode: true,
-          courseName: true,
-          description: true,
-          credits: true,
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId, isActive: true },
+      orderBy: { enrolledAt: "asc" },
+      select: {
+        completionPercentage: true,
+        course: {
+          select: {
+            id: true,
+            courseCode: true,
+            courseName: true,
+            description: true,
+            credits: true,
+          },
         },
       },
-    },
-  })
+    })
 
-  return NextResponse.json({ enrollments })
+    return NextResponse.json({ enrollments })
+  } catch (error) {
+    console.error("[CRITICAL_ERROR] Route /api/enrollments failed:", error)
+    return NextResponse.json({ error: "אירעה שגיאה בטעינת הקורסים. נסה שוב מאוחר יותר." }, { status: 500 })
+  }
 }

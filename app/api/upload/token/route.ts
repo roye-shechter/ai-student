@@ -13,9 +13,9 @@ import { PDF_TYPES, TXT_TYPES, AUDIO_TYPES, IMAGE_TYPES } from "@/lib/rag/extrac
  * completes.
  */
 export async function POST(req: Request) {
-  const body = (await req.json()) as HandleUploadBody
-
   try {
+    const body = (await req.json()) as HandleUploadBody
+
     const jsonResponse = await handleUpload({
       body,
       request: req,
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(jsonResponse)
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Upload token request failed"
-    return NextResponse.json({ error: message }, { status: 400 })
+    console.error("[CRITICAL_ERROR] Route /api/upload/token failed:", error)
+    return NextResponse.json({ error: "אירעה שגיאה בהפקת אישור ההעלאה. נסה שוב." }, { status: 400 })
   }
 }

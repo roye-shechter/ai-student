@@ -97,8 +97,6 @@ export async function POST(
     })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/courses/[courseId]/quiz/generate failed:", error)
-    const message =
-      error instanceof Error ? error.message : "Unexpected server error during quiz generation"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה ביצירת המבחן. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

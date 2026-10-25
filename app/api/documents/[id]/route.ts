@@ -47,8 +47,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ id, title })
   } catch (error) {
     console.error("[CRITICAL_ERROR] PATCH /api/documents/[id] failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בשינוי שם המסמך. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }
 
@@ -74,7 +73,6 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ id, deleted: true })
   } catch (error) {
     console.error("[CRITICAL_ERROR] DELETE /api/documents/[id] failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה במחיקת המסמך. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

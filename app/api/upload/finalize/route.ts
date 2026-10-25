@@ -213,8 +213,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/upload/finalize failed:", error)
-    const message =
-      error instanceof Error ? error.message : "Unexpected server error during upload"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בהעלאת המסמך. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

@@ -27,8 +27,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ courseId: stri
     return NextResponse.json({ examDates })
   } catch (error) {
     console.error("[CRITICAL_ERROR] GET /api/courses/[courseId]/exam-dates failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בטעינת מועדי הבחינות. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }
 
@@ -71,7 +70,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ courseId: strin
     return NextResponse.json({ examDate })
   } catch (error) {
     console.error("[CRITICAL_ERROR] PUT /api/courses/[courseId]/exam-dates failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בשמירת מועד הבחינה. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

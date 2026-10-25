@@ -200,8 +200,7 @@ export async function POST(req: Request) {
           // that's expected, not a failure, so it gets no error line.
           if (!abortController.signal.aborted) {
             console.error("[CRITICAL_ERROR] /api/chat stream failed:", error)
-            const message = error instanceof Error ? error.message : "Unexpected server error during chat"
-            safeEnqueue({ type: "error", message })
+            safeEnqueue({ type: "error", message: "אירעה שגיאה בתשובת המורה. נסה שוב." })
           }
         } finally {
           if (!closed) {
@@ -224,8 +223,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/chat failed:", error)
-    const message =
-      error instanceof Error ? error.message : "Unexpected server error during chat"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בשרת ה-AI. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

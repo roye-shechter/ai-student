@@ -14,25 +14,30 @@ export const runtime = "nodejs"
 
 /** All active courses available to enroll in (for the onboarding picker). */
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const courses = await prisma.course.findMany({
+      where: { isActive: true },
+      orderBy: { courseCode: "asc" },
+      select: {
+        id: true,
+        courseCode: true,
+        courseName: true,
+        description: true,
+        credits: true,
+        instructorName: true,
+      },
+    })
+
+    return NextResponse.json({ courses })
+  } catch (error) {
+    console.error("[CRITICAL_ERROR] Route /api/courses (GET) failed:", error)
+    return NextResponse.json({ error: "אירעה שגיאה בטעינת הקורסים. נסה שוב מאוחר יותר." }, { status: 500 })
   }
-
-  const courses = await prisma.course.findMany({
-    where: { isActive: true },
-    orderBy: { courseCode: "asc" },
-    select: {
-      id: true,
-      courseCode: true,
-      courseName: true,
-      description: true,
-      credits: true,
-      instructorName: true,
-    },
-  })
-
-  return NextResponse.json({ courses })
 }
 
 const createCourseSchema = z.object({
@@ -152,8 +157,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ course }, { status: 201 })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/courses (POST) failed:", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to create course"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה ביצירת הקורס. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }

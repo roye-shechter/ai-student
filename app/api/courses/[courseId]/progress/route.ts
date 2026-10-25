@@ -84,7 +84,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ courseId: stri
     })
   } catch (error) {
     console.error("[CRITICAL_ERROR] Route /api/courses/[courseId]/progress failed:", error)
-    const message = error instanceof Error ? error.message : "Unexpected server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: "אירעה שגיאה בטעינת ההתקדמות. נסה שוב מאוחר יותר." }, { status: 500 })
   }
 }
