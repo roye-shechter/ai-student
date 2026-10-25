@@ -11,6 +11,7 @@
     "test:rag": "tsx scripts/test-rag.mjs",
     "test:router": "tsx scripts/test-llm-router.mjs",
     "test:providers": "tsx scripts/test-llm-providers.mjs",
+    "test:prompt": "tsx scripts/test-tutor-prompt.mjs",
     "postinstall": "prisma generate"
   },
   "prisma": {
