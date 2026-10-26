@@ -94,8 +94,20 @@ export function formatTokens(value: number): string {
   return value >= 1_000_000 ? `${(value / 1_000_000).toFixed(2)}M` : value >= 1000 ? `${(value / 1000).toFixed(1)}K` : String(value)
 }
 
-/** Duration in seconds, e.g. "95 שניות". */
+/**
+ * Human-friendly duration, picking the roundest unit that still reads
+ * precisely: "42 שניות" under a minute, "17 דקות" under an hour, "3 שעות
+ * ו-12 דקות" (or just "3 שעות" with no remainder) beyond that. Replaces a
+ * previous version that always showed the raw seconds count — fine for a
+ * handful of seconds, unreadable for a real study session ("25,980 שניות").
+ */
 export function formatSeconds(value: number | null): string {
   if (value === null) return "—"
-  return `${value.toLocaleString("he-IL")} שניות`
+  const totalSeconds = Math.max(0, Math.round(value))
+  if (totalSeconds < 60) return `${totalSeconds} שניות`
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  if (totalMinutes < 60) return `${totalMinutes} דקות`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return minutes > 0 ? `${hours} שעות ו-${minutes} דקות` : `${hours} שעות`
 }

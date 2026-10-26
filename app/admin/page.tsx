@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ShieldCheck, Loader2, Users, BookOpen, FileText, Activity, LogOut,
   LogIn, BookPlus, FileUp, GraduationCap, AlertCircle,
@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readJson } from "@/lib/http"
 import { AdminModelUsage } from "@/components/admin-model-usage"
-import { formatDayLabel, formatDayLong } from "@/lib/admin-time"
+import { formatDayLabel, formatDayLong, formatSeconds } from "@/lib/admin-time"
 import { AdminUserDialog } from "@/components/admin-user-dialog"
 import { AdminRecordsDialog, type RecordFilters, type RecordKind } from "@/components/admin-records-dialog"
+import { AdminCoursesDialog } from "@/components/admin-courses-dialog"
 
 type OpenRecords = { kind: RecordKind; filters: RecordFilters; title: string }
 
@@ -62,10 +63,20 @@ const ACTIVITY_META: Record<string, { label: string; icon: typeof LogIn }> = {
   quiz_completed: { label: "השלמת מבחן תרגול", icon: GraduationCap },
 }
 
+/**
+ * "לפני X" at whichever granularity actually reads naturally — seconds only
+ * for the first minute, then minutes, then hours, then days. Previously
+ * jumped straight from seconds to days, so anything under 24h showed as a
+ * raw, unreadable count like "לפני 63,988 שניות".
+ */
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const sec = Math.max(0, Math.floor(diffMs / 1000))
-  if (sec < 86400) return sec === 0 ? "0 שניות" : `לפני ${sec.toLocaleString("he-IL")} שניות`
+  if (sec < 60) return sec === 0 ? "ממש עכשיו" : `לפני ${sec} שניות`
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `לפני ${min} דקות`
+  const hours = Math.floor(min / 60)
+  if (hours < 24) return `לפני ${hours} שעות`
   const day = Math.floor(sec / 86400)
   if (day < 30) return `לפני ${day} ימים`
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" })
@@ -162,9 +173,23 @@ function AdminGate({ onAuthenticated }: { onAuthenticated: (admin: AdminIdentity
   )
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string | number }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  onClick,
+}: {
+  icon: typeof Users
+  label: string
+  value: string | number
+  /** When given, the whole card becomes a button that opens the detail view for this stat. */
+  onClick?: () => void
+}) {
   return (
-    <Card className="glass-panel border-[#242b3a] text-white">
+    <Card
+      onClick={onClick}
+      className={`glass-panel border-[#242b3a] text-white ${onClick ? "cursor-pointer hover:border-[#ff7a3d]/60 transition-colors" : ""}`}
+    >
       <CardContent className="p-5 flex items-center gap-3">
         <div className="p-2.5 rounded-full bg-[#161b26] text-[#ffb066]"><Icon size={18} /></div>
         <div>
@@ -185,6 +210,8 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
   const [error, setError] = useState<string | null>(null)
   const [detailUserId, setDetailUserId] = useState<string | null>(null)
   const [openRecords, setOpenRecords] = useState<OpenRecords | null>(null)
+  const [showCourses, setShowCourses] = useState(false)
+  const usersTableRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -266,9 +293,14 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
         </header>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard icon={Users} label="סה״כ משתמשים" value={overview.totals.userCount} />
+          <StatCard
+            icon={Users}
+            label="סה״כ משתמשים"
+            value={overview.totals.userCount}
+            onClick={() => usersTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          />
           <StatCard icon={Activity} label="פעילים השבוע" value={overview.totals.activeUsers7d} />
-          <StatCard icon={BookOpen} label="סה״כ קורסים" value={overview.totals.courseCount} />
+          <StatCard icon={BookOpen} label="סה״כ קורסים" value={overview.totals.courseCount} onClick={() => setShowCourses(true)} />
           <StatCard icon={FileText} label="סה״כ מסמכים" value={overview.totals.documentCount} />
         </div>
 
@@ -312,8 +344,9 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
             onClose={() => setOpenRecords(null)}
           />
         )}
+        {showCourses && <AdminCoursesDialog onClose={() => setShowCourses(false)} />}
 
-        <Card className="glass-panel border-[#242b3a] text-white">
+        <Card ref={usersTableRef} className="glass-panel border-[#242b3a] text-white scroll-mt-6">
           <CardHeader>
             <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
               <Users size={16} /> משתמשים
@@ -329,7 +362,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
                   <th className="py-2 pl-4 font-medium">כניסה אחרונה</th>
                   <th className="py-2 pl-4 font-medium">IP אחרון</th>
                   <th className="py-2 pl-4 font-medium">בקשות</th>
-                  <th className="py-2 pl-4 font-medium">שניות למידה</th>
+                  <th className="py-2 pl-4 font-medium">זמן למידה</th>
                   <th className="py-2 font-medium">פעיל</th>
                 </tr>
               </thead>
@@ -354,7 +387,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
                     <td className="py-2.5 pl-4 text-xs" title={`צ׳אט ${u.requestBreakdown.chat} · העלאות ${u.requestBreakdown.upload} · מבחנים ${u.requestBreakdown.quiz}`}>
                       {u.totalRequests}
                     </td>
-                    <td className="py-2.5 pl-4 text-xs tabular-nums">{u.totalLearningSeconds.toLocaleString("he-IL")}</td>
+                    <td className="py-2.5 pl-4 text-xs tabular-nums">{formatSeconds(u.totalLearningSeconds)}</td>
                     <td className="py-2.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${u.isActive7d ? "bg-emerald-950/60 text-emerald-400 border border-emerald-800/50" : "bg-[#161b26] text-neutral-500 border border-[#242b3a]"}`}>
                         {u.isActive7d ? "פעיל" : "לא פעיל"}
