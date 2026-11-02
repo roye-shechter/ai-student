@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
+import { MAINTENANCE_MESSAGE, MAINTENANCE_MODE } from "@/lib/maintenance"
 
 // Validation schema
 const registerSchema = z.object({
@@ -29,6 +30,14 @@ function isUniqueConstraintError(
 }
 
 export async function POST(req: NextRequest) {
+  // Site-wide maintenance lock (lib/maintenance.ts) — no new account can
+  // ever be the one allowed username, so registration is simply off while
+  // it's on. The register page itself doesn't even show the form, but this
+  // is the real enforcement in case someone calls the API directly.
+  if (MAINTENANCE_MODE) {
+    return NextResponse.json({ error: MAINTENANCE_MESSAGE }, { status: 503 })
+  }
+
   try {
     const body = await req.json()
     

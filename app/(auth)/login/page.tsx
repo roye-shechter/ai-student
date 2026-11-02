@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { gsap, useGSAP } from "@/lib/gsap"
 import { markJustLoggedIn } from "@/components/welcome-splash"
+import { MAINTENANCE_MESSAGE, isMaintenanceAllowedUsername } from "@/lib/maintenance"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -46,6 +47,15 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     setError("")
+
+    // Client-side check for a clear, specific message — the real
+    // enforcement is server-side in lib/auth.ts's authorize(), which blocks
+    // this regardless of whether this check ran at all.
+    if (!isMaintenanceAllowedUsername(formData.username)) {
+      setError(MAINTENANCE_MESSAGE)
+      setIsLoading(false)
+      return
+    }
 
     try {
       const result = await signIn("credentials", {

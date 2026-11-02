@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { readJson } from "@/lib/http"
 import { gsap, useGSAP } from "@/lib/gsap"
+import { MAINTENANCE_MESSAGE, MAINTENANCE_MODE } from "@/lib/maintenance"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -79,6 +80,25 @@ export default function RegisterPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // No new account can ever be the one allowed username during maintenance
+  // mode (lib/maintenance.ts), so there's no form to show here at all — not
+  // just a rejected submission.
+  if (MAINTENANCE_MODE) {
+    return (
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4" dir="rtl">
+        <div className="w-full max-w-md text-center space-y-4">
+          <h1 className="font-serif gold-text text-4xl tracking-tight">האתר בבנייה</h1>
+          <div className="glass-panel border border-[#242b3a] rounded-sm p-8 space-y-4">
+            <p className="text-[#c9c9d1] leading-relaxed">{MAINTENANCE_MESSAGE}</p>
+            <Link href="/login" className="inline-block text-[#ffb066] hover:text-[#f5f6f8] font-medium transition-colors">
+              יש לך כבר חשבון? התחבר כאן
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

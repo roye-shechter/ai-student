@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logActivity, extractIp, extractUserAgent } from "@/lib/activity-log"
 import { isLoginBlocked, recordFailedLogin } from "@/lib/login-rate-limit"
+import { isMaintenanceAllowedUsername } from "@/lib/maintenance"
 
 // Validation schemas
 const loginSchema = z.object({
@@ -35,6 +36,17 @@ export const authOptions: NextAuthOptions = {
         try {
           // Validate input
           const { username, password } = loginSchema.parse(credentials)
+
+          // Site-wide maintenance lock — see lib/maintenance.ts. Checked
+          // first (before any DB query) since it's the cheapest possible
+          // check and, while it's on, should block every other credential
+          // regardless of whether the password would've been correct. The
+          // login page itself also checks this client-side for a clearer
+          // message, but the real enforcement has to live here — a client
+          // check alone could be bypassed by calling the API directly.
+          if (!isMaintenanceAllowedUsername(username)) {
+            throw new Error("Site under maintenance")
+          }
 
           const headers = (req?.headers ?? {}) as Record<string, string | string[] | undefined>
           // Falls back to a shared bucket when the IP can't be determined
