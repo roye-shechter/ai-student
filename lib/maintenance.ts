@@ -11,7 +11,7 @@
  * a secret, so there's no harm in it being visible client-side.
  */
 
-export const MAINTENANCE_MODE = true
+export const MAINTENANCE_MODE = false
 export const MAINTENANCE_ALLOWED_USERNAME = "yerahmiel"
 
 /** True if this username may use the site right now (always true when maintenance mode is off). */
