@@ -25,6 +25,7 @@ import { buildTutorSystem } from "@/lib/llm/tutor-prompt"
 import { verifyAnswer, type Verdict } from "@/lib/llm/verify"
 import { logModelUsage } from "@/lib/llm/usage"
 import { getDueTopics, recordWeakTopic } from "./spaced-repetition"
+import { getCourseStatusBlock } from "./course-status"
 
 /**
  * Retrieval + routed answer pipeline.
@@ -243,10 +244,15 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
 
   const route = chooseRoute(message, { hasImage: !!image })
   const limits = ROUTE_LIMITS[route]
-  const [chunks, history, weakTopics] = await Promise.all([
+  // Skipped on "quick" (see lib/llm/route.ts) — that route exists to stay
+  // under Groq's free-tier tokens-per-minute cap for short definitional
+  // questions, and course status is both token cost and context the model
+  // doesn't need to answer e.g. "what's Ohm's law".
+  const [chunks, history, weakTopics, courseStatus] = await Promise.all([
     retrieveContext({ userId, courseId, query: message, topK: limits?.topK ?? topK }),
     getRecentHistory(sessionId, limits?.historyLimit ?? historyLimit),
     getWeakTopics(userId, courseId),
+    route === "quick" ? Promise.resolve("") : getCourseStatusBlock(userId, courseId),
   ])
 
   const persistedMessage = image ? `${message}\n\n[צורפה תמונה]` : message
@@ -255,7 +261,10 @@ export async function* chatStream(params: ChatParams): AsyncGenerator<ChatStream
   const target = ROUTE_TARGETS[route]
   yield { type: "sources", chunks, route, model: target.model }
 
-  const system = buildTutorSystem(userName, { confused: isConfusionSignal(message) })
+  const system = buildTutorSystem(userName, {
+    confused: isConfusionSignal(message),
+    courseStatus: courseStatus || undefined,
+  })
   const prompt = buildPrompt({ chunks, history, weakTopics, query: message })
 
   let answer = ""

@@ -65,6 +65,11 @@ const STATIC_POLICY = [
   "## בדיקת הבנה",
   "אם מתח שיא של 170V, מה ה-RMS? (רמז: 170 / √2)",
   "</example>",
+  "",
+  "ז. מודעות לסטטוס הסטודנט בקורס (Course Awareness):",
+  "- בכל הודעה מצורף לך גם 'סטטוס הסטודנט בקורס הנוכחי' — תאריך היום, מועדי הבחינות של הקורס, והיסטוריית מבחני התרגול שלו. התייחס אליו באופן טבעי כשזה רלוונטי (למשל כששואלים 'מתי המבחן', 'כמה זמן נשאר', או כשזה הרגע הנכון להזכיר מועד מתקרב) — אל תחזור עליו בכל הודעה בלי קשר, זה ייראה מכני וטורדני.",
+  "- אם מועד בחינה מתקרב ועדיין לא בוצע מבחן תרגול לאחרונה, זה הקשר טוב להציע תרגול ממוקד — תמיד בעדינות, לא כנזיפה.",
+  "- אם הסטודנט מעולם לא ביצע מבחן תרגול בקורס, חפש הזדמנות טבעית (לא בכל הודעה) להציע לו לנסות אחד — תרגול פעיל הוא הדרך האמינה ביותר לוודא הבנה אמיתית, לא רק שיחה.",
 ].join("\n")
 
 export type TutorSystem = {
@@ -72,11 +77,17 @@ export type TutorSystem = {
   dynamic: string
 }
 
-export function buildTutorSystem(userName: string, options: { confused?: boolean } = {}): TutorSystem {
+export function buildTutorSystem(
+  userName: string,
+  options: { confused?: boolean; courseStatus?: string } = {}
+): TutorSystem {
   const dynamicLines = [
     `שם הסטודנט הוא ${userName}.`,
     `בתחילת השיחה (כאשר עדיין אין היסטוריית שיחה) פתח תמיד בברכה אישית — לדוגמה: "שלום ${userName}," — ורק לאחר מכן ענה לגופו של עניין.`,
   ]
+  if (options.courseStatus) {
+    dynamicLines.push(options.courseStatus)
+  }
   // Set from lib/llm/route.ts's isConfusionSignal() — a reliable, cheap
   // detection of the exact phrasings section ה already describes, repeated
   // here in the per-request (uncached) part of the prompt so it lands with
