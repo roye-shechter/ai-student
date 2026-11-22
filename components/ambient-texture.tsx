@@ -1,18 +1,23 @@
 /**
  * Atmospheric backdrop for the "AI Platform" identity: a deep navy canvas
  * lit by one warm amber glow, sitting behind every page instead of only a
- * marketing hero. Abstract, not anatomical — and not a literal orbit ring
- * either: a full closed halo reads as generic "AI product" chrome the
- * moment the page is still, so the one ring here is a partial arc (a
- * quarter-turn "progress sweep", in keeping with a platform about tracking
- * a student's progress) that drifts slowly around the glow rather than
- * sitting there as a complete circle. A sparse star-field (a handful of
- * nodes, almost no connecting lines — a dense node/edge mesh is the other
- * half of that same "AI network" cliché) and a few thin light streaks
- * drifting upward out of the glow and fading round it out. Data is
- * pre-generated offline with a seeded RNG (not computed at runtime) so it's
- * fixed and never shifts between loads. Server component: the animation is
- * pure CSS, so this still costs nothing at runtime.
+ * marketing hero. Earlier revisions of this file were explicitly "abstract,
+ * not anatomical" (an orbit ring + star-field, per a past request to move
+ * away from anything brain-shaped) — the user has since asked for the
+ * opposite: a brain silhouette here too, echoing the sister "mentality"
+ * site, but reworked for this role rather than copied. That hero treatment
+ * is bold, central, green, and interactive; this one sits behind real
+ * content on every page, so it stays amber, faint, and static — a shape
+ * you'd only consciously notice if you looked for it: two hemisphere
+ * outlines, a central fissure, a small stem, and a handful of "neuron"
+ * nodes confined to that silhouette (no dense node/edge mesh — that's
+ * still the generic "AI network" cliché this file has always avoided).
+ * No entrance animation, since that would replay on every navigation, and
+ * no pointer interactivity, since this renders on every page and a mouse
+ * listener here is pure overhead for a background element. Geometry is
+ * computed once at module load with a seeded RNG — cheap, deterministic,
+ * no client JS required. Server component: the animation is pure CSS, so
+ * this still costs nothing at runtime.
  *
  * The three glow blur() radii below were trimmed down (was 110/60/55px) —
  * large stacked CSS blurs are GPU/memory-heavy on iOS Safari specifically,
@@ -24,56 +29,161 @@
  * below on touch devices (same mechanism as prefers-reduced-motion).
  */
 
-/** Samples a partial ellipse into a polyline path — an open arc, never a closed ring. */
-function arcPath(cx: number, cy: number, rx: number, ry: number, startDeg: number, endDeg: number, steps = 48) {
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const BRAIN_CENTER_X = 450
+const LEFT_LOBE = { cx: 390, cy: 215, rx: 150, ry: 165 }
+const RIGHT_LOBE = { cx: 510, cy: 215, rx: 150, ry: 165 }
+const STEM_TOP = 365
+const STEM_BOTTOM = 455
+const STEM_TOP_HALF_WIDTH = 30
+const STEM_BOTTOM_HALF_WIDTH = 12
+const FISSURE_HALF_WIDTH = 11
+
+function inEllipse(x: number, y: number, e: { cx: number; cy: number; rx: number; ry: number }) {
+  const dx = (x - e.cx) / e.rx
+  const dy = (y - e.cy) / e.ry
+  return dx * dx + dy * dy <= 1
+}
+
+function inStem(x: number, y: number) {
+  if (y < STEM_TOP || y > STEM_BOTTOM) return false
+  const t = (y - STEM_TOP) / (STEM_BOTTOM - STEM_TOP)
+  const halfWidth = STEM_TOP_HALF_WIDTH + (STEM_BOTTOM_HALF_WIDTH - STEM_TOP_HALF_WIDTH) * t
+  return Math.abs(x - BRAIN_CENTER_X) <= halfWidth
+}
+
+function inBrain(x: number, y: number) {
+  if (inStem(x, y)) return true
+  const left = inEllipse(x, y, LEFT_LOBE)
+  const right = inEllipse(x, y, RIGHT_LOBE)
+  if (!left && !right) return false
+  if (y < STEM_TOP && Math.abs(x - BRAIN_CENTER_X) < FISSURE_HALF_WIDTH) return false
+  return true
+}
+
+type Lobe = { cx: number; cy: number; rx: number; ry: number }
+
+function wavePoint(lobe: Lobe, a: number, inset: number, freq: number, amp: number, phase: number) {
+  const r = 1 + Math.sin(a * freq + phase) * amp
+  return [lobe.cx + Math.cos(a) * lobe.rx * inset * r, lobe.cy + Math.sin(a) * lobe.ry * inset * r] as const
+}
+
+function arcPath(lobe: Lobe, inset: number, freq: number, amp: number, phase: number, startA: number, endA: number, steps = 56) {
   let d = ''
   for (let i = 0; i <= steps; i++) {
-    const deg = startDeg + ((endDeg - startDeg) * i) / steps
-    const a = (deg * Math.PI) / 180
-    const x = cx + rx * Math.cos(a)
-    const y = cy + ry * Math.sin(a)
+    const a = startA + ((endA - startA) * i) / steps
+    const [x, y] = wavePoint(lobe, a, inset, freq, amp, phase)
     d += i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)} ` : `L${x.toFixed(1)},${y.toFixed(1)} `
   }
   return d
 }
 
-const RING_CENTER = { cx: 450, cy: 250, rx: 320, ry: 112 }
-const RING_ARC = arcPath(RING_CENTER.cx, RING_CENTER.cy, RING_CENTER.rx, RING_CENTER.ry, -150, 60)
+/**
+ * An outer contour plus a couple of inner fold arcs — a bare outline of two
+ * overlapping ellipses reads as two moons, not a brain; a few cortical
+ * folds (same idea as the "mentality" hero, much fainter) are what actually
+ * sells the shape at a glance.
+ */
+function foldLines(lobe: Lobe, seed: number) {
+  const rand = mulberry32(seed)
+  const lines: { path: string; opacity: number; width: number }[] = []
 
-// prettier-ignore
-const CONSTELLATION_NODES = [
-  { x: 264.4, y: 163.3, r: 2.55, o: 0.52, d: 3.61, dl: 2.63 }, { x: 412.8, y: 410.4, r: 2.57, o: 0.44, d: 3.87, dl: 4.41 }, { x: 444.5, y: 119.4, r: 1.44, o: 0.45, d: 5.4, dl: 3.05 },
-  { x: 684, y: 253.6, r: 2.52, o: 0.27, d: 5.07, dl: 0.16 }, { x: 434.9, y: 339.5, r: 1.42, o: 0.56, d: 4.86, dl: 0.14 }, { x: 581.5, y: 408.5, r: 1.93, o: 0.57, d: 4.12, dl: 2.25 },
-  { x: 583.8, y: 270.3, r: 2.05, o: 0.49, d: 3.86, dl: 3.23 }, { x: 501.8, y: 376.1, r: 2.36, o: 0.59, d: 4.78, dl: 1.02 }, { x: 406.6, y: 376, r: 1.23, o: 0.51, d: 5.38, dl: 3.47 },
-  { x: 586.9, y: 207.8, r: 2.7, o: 0.42, d: 6.3, dl: 0.69 }, { x: 539.3, y: 297.3, r: 1.71, o: 0.44, d: 5.14, dl: 4.5 }, { x: 686.9, y: 329.5, r: 2.69, o: 0.36, d: 5.47, dl: 0.9 },
-  { x: 171.9, y: 227.4, r: 1.31, o: 0.65, d: 4.97, dl: 4.58 }, { x: 221.5, y: 313.7, r: 1.67, o: 0.49, d: 4.13, dl: 3.65 }, { x: 385.3, y: 390.3, r: 2.53, o: 0.53, d: 6.48, dl: 4.45 },
-  { x: 227, y: 314.4, r: 1.6, o: 0.29, d: 5.44, dl: 1.57 }, { x: 514.9, y: 71.2, r: 1.26, o: 0.44, d: 5.88, dl: 0.65 }, { x: 626.1, y: 230.7, r: 2.31, o: 0.53, d: 3.78, dl: 2.06 },
-  { x: 584.5, y: 390.9, r: 1.67, o: 0.33, d: 5.2, dl: 4.43 }, { x: 322.1, y: 405.6, r: 1.77, o: 0.3, d: 6.02, dl: 1.85 }, { x: 719.8, y: 260.2, r: 2.18, o: 0.6, d: 6.18, dl: 1.04 },
-  { x: 261.9, y: 158.8, r: 1.41, o: 0.27, d: 5.47, dl: 3.54 }, { x: 398.4, y: 372.5, r: 1.67, o: 0.26, d: 3.77, dl: 4.97 }, { x: 181.6, y: 166.9, r: 1.38, o: 0.32, d: 4.96, dl: 1.46 },
-  { x: 269.8, y: 338.9, r: 1.81, o: 0.52, d: 4.39, dl: 1.68 }, { x: 616.6, y: 168.9, r: 1.94, o: 0.49, d: 4.91, dl: 2.95 }, { x: 469.2, y: 382.3, r: 1.61, o: 0.38, d: 5.34, dl: 1.1 },
-  { x: 578.7, y: 396.8, r: 1.63, o: 0.3, d: 4.1, dl: 0.21 }, { x: 285.9, y: 194.9, r: 1.92, o: 0.4, d: 5.49, dl: 4.56 }, { x: 536.6, y: 115.6, r: 1.36, o: 0.6, d: 4.84, dl: 4.2 },
-  { x: 632, y: 160, r: 1.35, o: 0.5, d: 5.83, dl: 1.04 }, { x: 261.5, y: 349.2, r: 2.77, o: 0.45, d: 6.01, dl: 4.22 }, { x: 444.4, y: 162.3, r: 1.22, o: 0.32, d: 4.77, dl: 3.38 },
-  { x: 470.3, y: 61, r: 2.49, o: 0.5, d: 5.93, dl: 4.26 },
-] as const
+  lines.push({ path: arcPath(lobe, 1, 3, 0.02, rand() * Math.PI * 2, 0, Math.PI * 2) + 'Z', opacity: 0.36, width: 1.1 })
 
-// A dense node/edge mesh is the generic "AI network" cliché — kept to three
-// faint, far-apart connections so it reads as stars that happen to align,
-// not a circuit diagram.
-// prettier-ignore
-const CONSTELLATION_EDGES = [
-  { x1: 264.4, y1: 163.3, x2: 261.9, y2: 158.8, d: 5.5, dl: 1.76 },
-  { x1: 171.9, y1: 227.4, x2: 181.6, y2: 166.9, d: 4.82, dl: 4.22 },
-  { x1: 470.3, y1: 61, x2: 514.9, y2: 71.2, d: 4.35, dl: 0.24 },
-] as const
+  const upperArcs = [
+    { inset: 0.82, range: 0.9 },
+    { inset: 0.6, range: 0.76 },
+  ]
+  for (const { inset, range } of upperArcs) {
+    const freq = 3 + Math.floor(rand() * 2)
+    const amp = 0.05 + rand() * 0.04
+    const phase = rand() * Math.PI * 2
+    lines.push({
+      path: arcPath(lobe, inset, freq, amp, phase, -Math.PI * range, -Math.PI * (1 - range)),
+      opacity: 0.22,
+      width: 0.9,
+    })
+  }
+
+  lines.push({
+    path: arcPath(lobe, 0.55, 2, 0.08, rand() * Math.PI * 2, Math.PI * 0.1, Math.PI * 0.5),
+    opacity: 0.24,
+    width: 0.9,
+  })
+
+  return lines
+}
+
+function stemPath() {
+  const midY = (STEM_TOP + STEM_BOTTOM) / 2
+  return [
+    `M ${BRAIN_CENTER_X - STEM_TOP_HALF_WIDTH} ${STEM_TOP}`,
+    `Q ${BRAIN_CENTER_X - STEM_TOP_HALF_WIDTH * 0.8} ${midY} ${BRAIN_CENTER_X - STEM_BOTTOM_HALF_WIDTH} ${STEM_BOTTOM}`,
+    `L ${BRAIN_CENTER_X + STEM_BOTTOM_HALF_WIDTH} ${STEM_BOTTOM}`,
+    `Q ${BRAIN_CENTER_X + STEM_TOP_HALF_WIDTH * 0.8} ${midY} ${BRAIN_CENTER_X + STEM_TOP_HALF_WIDTH} ${STEM_TOP}`,
+  ].join(' ')
+}
+
+function fissurePath() {
+  const top = LEFT_LOBE.cy - LEFT_LOBE.ry
+  return `M ${BRAIN_CENTER_X} ${top + 6} Q ${BRAIN_CENTER_X - 6} ${LEFT_LOBE.cy} ${BRAIN_CENTER_X} ${STEM_TOP - 2}`
+}
+
+const LEFT_FOLDS = foldLines(LEFT_LOBE, 7001)
+const RIGHT_FOLDS = foldLines(RIGHT_LOBE, 7002)
+const STEM_PATH = stemPath()
+const FISSURE_PATH = fissurePath()
+
+// A handful of "neuron" nodes, confined to the brain's own silhouette
+// instead of scattered freely — a seeded RNG, computed once at module load.
+function generateNeurons(seed: number, count: number) {
+  const rand = mulberry32(seed)
+  const nodes: { x: number; y: number; r: number; o: number; d: number; dl: number }[] = []
+  let attempts = 0
+  while (nodes.length < count && attempts < count * 60) {
+    attempts++
+    const x = 240 + rand() * 420
+    const y = 50 + rand() * 410
+    if (!inBrain(x, y)) continue
+    nodes.push({ x, y, r: 1.2 + rand() * 1.6, o: 0.25 + rand() * 0.35, d: 4 + rand() * 2.5, dl: rand() * 5 })
+  }
+  return nodes
+}
+
+const NEURONS = generateNeurons(7003, 16)
+
+// Two or three quiet connections among nearby neurons — enough to read as
+// "signal", never enough to read as a circuit diagram.
+function generateSynapses(nodes: typeof NEURONS, maxCount: number, maxDist: number) {
+  const edges: { x1: number; y1: number; x2: number; y2: number; d: number; dl: number }[] = []
+  const rand = mulberry32(7004)
+  for (let i = 0; i < nodes.length && edges.length < maxCount; i++) {
+    for (let j = i + 1; j < nodes.length && edges.length < maxCount; j++) {
+      const dist = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y)
+      if (dist > 0 && dist <= maxDist) {
+        edges.push({ x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, d: 5 + rand() * 2, dl: rand() * 4 })
+      }
+    }
+  }
+  return edges
+}
+
+const SYNAPSES = generateSynapses(NEURONS, 3, 90)
 
 // prettier-ignore
 const RISING_STREAKS = [
   { x: 387.3, y: 399.7, rise: 150, d: 7.29, dl: 5.56, o: 0.59 }, { x: 358.8, y: 420, rise: 146, d: 6.42, dl: 3.28, o: 0.49 },
   { x: 427.5, y: 389.9, rise: 128, d: 5.47, dl: 3.53, o: 0.43 }, { x: 459.2, y: 409.3, rise: 158, d: 6.4, dl: 0.94, o: 0.35 },
   { x: 344.5, y: 444.9, rise: 108, d: 7.79, dl: 3.01, o: 0.5 }, { x: 329.6, y: 434, rise: 106, d: 6.19, dl: 1.61, o: 0.56 },
-  { x: 469.2, y: 368.5, rise: 186, d: 7.4, dl: 4.63, o: 0.59 }, { x: 464.6, y: 432.4, rise: 148, d: 5.57, dl: 0.55, o: 0.38 },
-  { x: 317.9, y: 383.6, rise: 160, d: 7.14, dl: 3.93, o: 0.64 }, { x: 306.6, y: 395.7, rise: 130, d: 5.91, dl: 5.83, o: 0.51 },
-  { x: 361.5, y: 445, rise: 185, d: 5.85, dl: 3.63, o: 0.61 },
 ] as const
 
 export function AmbientTexture() {
@@ -90,8 +200,8 @@ export function AmbientTexture() {
       />
 
       {/* Two giant, page-scale arcs centered off opposite corners — only a
-          thin sliver of each huge circle crosses the canvas, echoing a
-          pair of orbit paths without ever closing into a literal ring. */}
+          thin sliver of each huge circle crosses the canvas, pure depth
+          texture, unrelated to the brain silhouette below. */}
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <circle cx={160} cy={-180} r={950} fill="none" stroke="#ffb066" strokeWidth={1} strokeOpacity={0.1} />
         <circle cx={1480} cy={1120} r={820} fill="none" stroke="#ffb066" strokeWidth={1} strokeOpacity={0.08} />
@@ -124,10 +234,9 @@ export function AmbientTexture() {
         }}
       />
 
-      {/* The orbital core: a partial arc drifting slowly around the glow
-          (never a complete ring), a sparse scatter of stars with only a
-          few faint connecting lines, and a few light streaks rising out
-          of the glow and fading near the top. */}
+      {/* The brain: two faint hemisphere outlines, a central fissure, a
+          small stem, and a sparse handful of neurons inside that shape —
+          static and quiet, a texture inside the glow rather than a hero. */}
       <svg
         className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 overflow-visible"
         viewBox="0 0 900 560"
@@ -141,19 +250,19 @@ export function AmbientTexture() {
           </linearGradient>
         </defs>
 
-        <path
-          className="ambient-ring"
-          d={RING_ARC}
-          fill="none"
-          stroke="#ffb066"
-          strokeWidth={1}
-          strokeOpacity={0.3}
-          strokeLinecap="round"
-          style={{ transformBox: 'view-box', transformOrigin: `${RING_CENTER.cx}px ${RING_CENTER.cy}px` }}
-        />
+        <g className="ambient-brain" fill="none" stroke="#ffb066" strokeLinejoin="round">
+          {LEFT_FOLDS.map((line, i) => (
+            <path key={`l${i}`} d={line.path} strokeWidth={line.width} strokeOpacity={line.opacity} />
+          ))}
+          {RIGHT_FOLDS.map((line, i) => (
+            <path key={`r${i}`} d={line.path} strokeWidth={line.width} strokeOpacity={line.opacity} />
+          ))}
+          <path d={STEM_PATH} strokeWidth={1} strokeOpacity={0.24} />
+          <path d={FISSURE_PATH} strokeWidth={1.2} strokeOpacity={0.36} strokeLinecap="round" />
+        </g>
 
         <g stroke="#ffb066" strokeLinecap="round">
-          {CONSTELLATION_EDGES.map((e, i) => (
+          {SYNAPSES.map((e, i) => (
             <line
               key={i}
               className="ambient-signal"
@@ -161,8 +270,8 @@ export function AmbientTexture() {
               y1={e.y1}
               x2={e.x2}
               y2={e.y2}
-              strokeWidth={0.75}
-              strokeOpacity={0.22}
+              strokeWidth={0.6}
+              strokeOpacity={0.18}
               strokeDasharray="3 10"
               style={{ animationDuration: `${e.d}s`, animationDelay: `${e.dl}s` }}
             />
@@ -170,7 +279,7 @@ export function AmbientTexture() {
         </g>
 
         <g>
-          {CONSTELLATION_NODES.slice(0, 18).map((n, i) => (
+          {NEURONS.map((n, i) => (
             <circle
               key={i}
               className="ambient-node"
@@ -185,7 +294,7 @@ export function AmbientTexture() {
         </g>
 
         <g>
-          {RISING_STREAKS.slice(0, 6).map((s, i) => (
+          {RISING_STREAKS.map((s, i) => (
             <line
               key={i}
               className="ambient-streak"

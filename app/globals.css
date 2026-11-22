@@ -183,11 +183,11 @@
     animation: tutor-pulse 2.5s ease-in-out infinite;
   }
 
-  /* Ambient background's orbital constellation — each node pulses on its
+  /* Ambient background's brain silhouette — each neuron node pulses on its
      own cycle (duration/delay set per-node inline, see
-     ambient-texture.tsx), each line plays a travelling "signal" via
-     animated stroke-dashoffset, the halo ring turns slowly around the
-     glow, and a few light streaks drift upward out of the glow and fade.
+     ambient-texture.tsx), each synapse line plays a travelling "signal" via
+     animated stroke-dashoffset, the brain outline itself barely breathes,
+     and a few light streaks drift upward out of the glow and fade.
      transform-box: fill-box/center scales/rotates each shape from its own
      middle, not the SVG canvas's (0,0) — the CSS default for SVG shapes,
      which would otherwise make everything drift instead of staying in
@@ -206,10 +206,9 @@
     animation-iteration-count: infinite;
   }
 
-  .ambient-ring {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: ambient-ring-spin 48s linear infinite;
+  .ambient-brain {
+    transform-box: view-box;
+    animation: ambient-brain-breathe 9s ease-in-out infinite;
   }
 
   .ambient-streak {
@@ -303,9 +302,9 @@
   to { stroke-dashoffset: -160; }
 }
 
-@keyframes ambient-ring-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes ambient-brain-breathe {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.012); }
 }
 
 @keyframes ambient-streak-rise {
@@ -323,7 +322,7 @@
   .tutor-avatar-ring,
   .ambient-node,
   .ambient-signal,
-  .ambient-ring,
+  .ambient-brain,
   .ambient-streak {
     animation: none !important;
   }
@@ -340,7 +339,7 @@
 @media (pointer: coarse) {
   .ambient-node,
   .ambient-signal,
-  .ambient-ring,
+  .ambient-brain,
   .ambient-streak {
     animation: none !important;
   }
