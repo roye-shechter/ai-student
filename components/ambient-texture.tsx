@@ -1,11 +1,15 @@
 /**
  * Atmospheric backdrop for the "AI Platform" identity: a deep navy canvas
  * lit by one warm amber glow, sitting behind every page instead of only a
- * marketing hero. Abstract and orbital, not anatomical: a slow-turning halo
- * ring around the glow, two faint page-scale arcs for depth, a sparse
- * star-field constellation (a scattered few dozen nodes with a handful of
- * long connecting lines, each playing a travelling "signal"), and a few
- * thin light streaks drifting upward out of the glow and fading. Data is
+ * marketing hero. Abstract, not anatomical — and not a literal orbit ring
+ * either: a full closed halo reads as generic "AI product" chrome the
+ * moment the page is still, so the one ring here is a partial arc (a
+ * quarter-turn "progress sweep", in keeping with a platform about tracking
+ * a student's progress) that drifts slowly around the glow rather than
+ * sitting there as a complete circle. A sparse star-field (a handful of
+ * nodes, almost no connecting lines — a dense node/edge mesh is the other
+ * half of that same "AI network" cliché) and a few thin light streaks
+ * drifting upward out of the glow and fading round it out. Data is
  * pre-generated offline with a seeded RNG (not computed at runtime) so it's
  * fixed and never shifts between loads. Server component: the animation is
  * pure CSS, so this still costs nothing at runtime.
@@ -19,6 +23,22 @@
  * matching `pointer: coarse` rule that stops the continuous SVG animations
  * below on touch devices (same mechanism as prefers-reduced-motion).
  */
+
+/** Samples a partial ellipse into a polyline path — an open arc, never a closed ring. */
+function arcPath(cx: number, cy: number, rx: number, ry: number, startDeg: number, endDeg: number, steps = 48) {
+  let d = ''
+  for (let i = 0; i <= steps; i++) {
+    const deg = startDeg + ((endDeg - startDeg) * i) / steps
+    const a = (deg * Math.PI) / 180
+    const x = cx + rx * Math.cos(a)
+    const y = cy + ry * Math.sin(a)
+    d += i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)} ` : `L${x.toFixed(1)},${y.toFixed(1)} `
+  }
+  return d
+}
+
+const RING_CENTER = { cx: 450, cy: 250, rx: 320, ry: 112 }
+const RING_ARC = arcPath(RING_CENTER.cx, RING_CENTER.cy, RING_CENTER.rx, RING_CENTER.ry, -150, 60)
 
 // prettier-ignore
 const CONSTELLATION_NODES = [
@@ -36,14 +56,14 @@ const CONSTELLATION_NODES = [
   { x: 470.3, y: 61, r: 2.49, o: 0.5, d: 5.93, dl: 4.26 },
 ] as const
 
+// A dense node/edge mesh is the generic "AI network" cliché — kept to three
+// faint, far-apart connections so it reads as stars that happen to align,
+// not a circuit diagram.
 // prettier-ignore
 const CONSTELLATION_EDGES = [
-  { x1: 264.4, y1: 163.3, x2: 261.9, y2: 158.8, d: 5.5, dl: 1.76 }, { x1: 684, y1: 253.6, x2: 719.8, y2: 260.2, d: 5.12, dl: 4.39 },
-  { x1: 583.8, y1: 270.3, x2: 539.3, y2: 297.3, d: 5.7, dl: 1.75 }, { x1: 586.9, y1: 207.8, x2: 626.1, y2: 230.7, d: 6.34, dl: 3.13 },
-  { x1: 171.9, y1: 227.4, x2: 181.6, y2: 166.9, d: 4.82, dl: 4.22 }, { x1: 227, y1: 314.4, x2: 221.5, y2: 313.7, d: 4.38, dl: 1.83 },
-  { x1: 584.5, y1: 390.9, x2: 578.7, y2: 396.8, d: 4.05, dl: 0.43 }, { x1: 261.9, y1: 158.8, x2: 264.4, y2: 163.3, d: 5.62, dl: 3.63 },
-  { x1: 269.8, y1: 338.9, x2: 261.5, y2: 349.2, d: 6.39, dl: 4.4 }, { x1: 578.7, y1: 396.8, x2: 584.5, y2: 390.9, d: 5.17, dl: 3.54 },
-  { x1: 632, y1: 160, x2: 616.6, y2: 168.9, d: 4.36, dl: 1.37 }, { x1: 470.3, y1: 61, x2: 514.9, y2: 71.2, d: 4.35, dl: 0.24 },
+  { x1: 264.4, y1: 163.3, x2: 261.9, y2: 158.8, d: 5.5, dl: 1.76 },
+  { x1: 171.9, y1: 227.4, x2: 181.6, y2: 166.9, d: 4.82, dl: 4.22 },
+  { x1: 470.3, y1: 61, x2: 514.9, y2: 71.2, d: 4.35, dl: 0.24 },
 ] as const
 
 // prettier-ignore
@@ -104,9 +124,9 @@ export function AmbientTexture() {
         }}
       />
 
-      {/* The orbital core: a tilted halo ring turning slowly around the
-          glow, a sparse constellation of nodes threaded by a handful of
-          long signal-carrying lines, and a few light streaks rising out
+      {/* The orbital core: a partial arc drifting slowly around the glow
+          (never a complete ring), a sparse scatter of stars with only a
+          few faint connecting lines, and a few light streaks rising out
           of the glow and fading near the top. */}
       <svg
         className="absolute left-1/2 top-[-18%] h-[560px] w-[900px] -translate-x-1/2 overflow-visible"
@@ -121,17 +141,15 @@ export function AmbientTexture() {
           </linearGradient>
         </defs>
 
-        <ellipse
+        <path
           className="ambient-ring"
-          cx={450}
-          cy={250}
-          rx={320}
-          ry={112}
+          d={RING_ARC}
           fill="none"
           stroke="#ffb066"
           strokeWidth={1}
-          strokeOpacity={0.24}
-          transform="rotate(-10 450 250)"
+          strokeOpacity={0.3}
+          strokeLinecap="round"
+          style={{ transformBox: 'view-box', transformOrigin: `${RING_CENTER.cx}px ${RING_CENTER.cy}px` }}
         />
 
         <g stroke="#ffb066" strokeLinecap="round">
@@ -152,7 +170,7 @@ export function AmbientTexture() {
         </g>
 
         <g>
-          {CONSTELLATION_NODES.map((n, i) => (
+          {CONSTELLATION_NODES.slice(0, 18).map((n, i) => (
             <circle
               key={i}
               className="ambient-node"
@@ -167,7 +185,7 @@ export function AmbientTexture() {
         </g>
 
         <g>
-          {RISING_STREAKS.map((s, i) => (
+          {RISING_STREAKS.slice(0, 6).map((s, i) => (
             <line
               key={i}
               className="ambient-streak"
