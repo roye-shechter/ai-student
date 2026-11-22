@@ -42,6 +42,17 @@ export default function CourseProgressPage() {
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
       tl.fromTo(".progress-header", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.5 })
         .fromTo(".progress-card", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, "-=0.2")
+
+      const scoreEl = document.querySelector<HTMLElement>(".progress-score-value")
+      if (scoreEl) {
+        const target = Number(scoreEl.dataset.value ?? 0)
+        const counter = { value: 0 }
+        tl.to(
+          counter,
+          { value: target, duration: 0.8, ease: "power1.out", onUpdate: () => { scoreEl.textContent = `${Math.round(counter.value)}%` } },
+          "-=0.3"
+        )
+      }
     },
     { scope: rootRef, dependencies: [loading] }
   )
@@ -171,7 +182,7 @@ export default function CourseProgressPage() {
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="font-serif text-2xl text-white">{avgScore}%</span>
+                        <span className="progress-score-value font-serif text-2xl text-white" data-value={avgScore}>0%</span>
                         <span className="text-[10px] text-neutral-400">{progress?.attemptCount} מבחנים</span>
                       </div>
                     </div>

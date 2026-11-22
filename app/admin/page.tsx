@@ -15,6 +15,7 @@ import { formatDayLabel, formatDayLong, formatSeconds } from "@/lib/admin-time"
 import { AdminUserDialog } from "@/components/admin-user-dialog"
 import { AdminRecordsDialog, type RecordFilters, type RecordKind } from "@/components/admin-records-dialog"
 import { AdminCoursesDialog } from "@/components/admin-courses-dialog"
+import { gsap, useGSAP } from "@/lib/gsap"
 
 type OpenRecords = { kind: RecordKind; filters: RecordFilters; title: string }
 
@@ -181,19 +182,19 @@ function StatCard({
 }: {
   icon: typeof Users
   label: string
-  value: string | number
+  value: number
   /** When given, the whole card becomes a button that opens the detail view for this stat. */
   onClick?: () => void
 }) {
   return (
     <Card
       onClick={onClick}
-      className={`glass-panel border-[#242b3a] text-white ${onClick ? "cursor-pointer hover:border-[#ff7a3d]/60 transition-colors" : ""}`}
+      className={`admin-stat-card glass-panel border-[#242b3a] text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 ${onClick ? "cursor-pointer hover:border-[#ff7a3d]/60" : ""}`}
     >
       <CardContent className="p-5 flex items-center gap-3">
         <div className="p-2.5 rounded-full bg-[#161b26] text-[#ffb066]"><Icon size={18} /></div>
         <div>
-          <p className="text-2xl font-serif text-white">{value}</p>
+          <p className="admin-stat-value text-2xl font-serif text-white tabular-nums" data-value={value}>0</p>
           <p className="text-xs text-neutral-500">{label}</p>
         </div>
       </CardContent>
@@ -212,6 +213,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
   const [openRecords, setOpenRecords] = useState<OpenRecords | null>(null)
   const [showCourses, setShowCourses] = useState(false)
   const usersTableRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -232,6 +234,32 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // One quiet entrance once real data has arrived — header settles, stat
+  // cards and the chart/table cards follow in reading order, and each stat
+  // number counts up to its real value (the same pattern already used on
+  // the main dashboard's course-progress numbers).
+  useGSAP(
+    () => {
+      if (loading || !overview) return
+      const tl = gsap.timeline({ defaults: { ease: "power2.out" } })
+      tl.fromTo(".admin-header", { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.6 })
+        .fromTo(".admin-stat-card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.08 }, "-=0.3")
+        .fromTo(".admin-chart-card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5 }, "-=0.25")
+        .fromTo(".admin-table-card", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.1 }, "-=0.3")
+
+      document.querySelectorAll<HTMLElement>(".admin-stat-value").forEach((el) => {
+        const target = Number(el.dataset.value ?? 0)
+        const counter = { value: 0 }
+        tl.to(
+          counter,
+          { value: target, duration: 0.8, ease: "power1.out", onUpdate: () => { el.textContent = Math.round(counter.value).toLocaleString("he-IL") } },
+          "-=0.6"
+        )
+      })
+    },
+    { scope: rootRef, dependencies: [loading, overview] }
+  )
 
   const loadMore = async () => {
     if (!nextCursor) return
@@ -273,9 +301,9 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
   const maxCount = Math.max(1, ...overview.dailyActivity.map((d) => d.count))
 
   return (
-    <div className="min-h-screen text-white p-6" dir="rtl">
+    <div ref={rootRef} className="min-h-screen text-white p-6" dir="rtl">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex items-center justify-between border-b border-[#242b3a] pb-4">
+        <header className="admin-header flex items-center justify-between border-b border-[#242b3a] pb-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="text-[#ff7a3d]" size={22} />
             <h1 className="font-serif text-2xl gold-text">פאנל ניהול</h1>
@@ -304,7 +332,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
           <StatCard icon={FileText} label="סה״כ מסמכים" value={overview.totals.documentCount} />
         </div>
 
-        <Card className="glass-panel border-[#242b3a] text-white">
+        <Card className="admin-chart-card glass-panel border-[#242b3a] text-white">
           <CardHeader>
             <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
               <Activity size={16} /> פעילות יומית (14 הימים האחרונים)
@@ -346,7 +374,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
         )}
         {showCourses && <AdminCoursesDialog onClose={() => setShowCourses(false)} />}
 
-        <Card ref={usersTableRef} className="glass-panel border-[#242b3a] text-white scroll-mt-6">
+        <Card ref={usersTableRef} className="admin-table-card glass-panel border-[#242b3a] text-white scroll-mt-6">
           <CardHeader>
             <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
               <Users size={16} /> משתמשים
@@ -400,7 +428,7 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
           </CardContent>
         </Card>
 
-        <Card className="glass-panel border-[#242b3a] text-white">
+        <Card className="admin-table-card glass-panel border-[#242b3a] text-white">
           <CardHeader>
             <CardTitle className="text-[#ffb066] flex items-center gap-2 font-sans text-sm font-medium">
               <Activity size={16} /> פעילות אחרונה
@@ -421,8 +449,8 @@ function AdminDashboard({ admin, onLogout }: { admin: AdminIdentity; onLogout: (
                 const meta = ACTIVITY_META[e.type] ?? { label: e.type, icon: Activity }
                 const Icon = meta.icon
                 return (
-                  <div key={e.id} className="flex items-center gap-3 py-2.5 border-b border-[#161b26] last:border-0 text-sm">
-                    <div className="p-1.5 rounded-full bg-[#161b26] text-[#ffb066] shrink-0"><Icon size={14} /></div>
+                  <div key={e.id} className="group flex items-center gap-3 py-2.5 border-b border-[#161b26] last:border-0 text-sm transition-colors hover:bg-[#161b26]/40 -mx-2 px-2 rounded-sm">
+                    <div className="p-1.5 rounded-full bg-[#161b26] text-[#ffb066] shrink-0 transition-colors group-hover:bg-[#ff7a3d]/15"><Icon size={14} /></div>
                     <div className="flex-1 min-w-0">
                       <span className="text-white">{e.user.fullName ?? e.user.username}</span>
                       <span className="text-neutral-500"> — {meta.label}</span>
