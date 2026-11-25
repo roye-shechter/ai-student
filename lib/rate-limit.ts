@@ -37,7 +37,7 @@ const ENV_KEY: Record<UsageKind, string> = {
 }
 const DEFAULT_LIMIT: Record<UsageKind, number> = {
   chat: 50,
-  upload: 10,
+  upload: 100,
   quiz: 10,
 }
 

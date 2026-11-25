@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { sanitizeText } from "./sanitize-text"
 import { assertEmbeddingEnv, EMBEDDING_MODEL, getOpenAI, toVectorSql, withTransientRetry } from "./clients"
 
 /**
@@ -190,7 +191,9 @@ async function insertChunkBatch(args: {
 export async function ingestDocument(params: IngestParams): Promise<IngestResult> {
   assertEmbeddingEnv()
 
-  const { userId, courseId, documentId, fileName, uploadTimestamp, text, chunkOptions } = params
+  const { userId, courseId, documentId, uploadTimestamp, chunkOptions } = params
+  const text = sanitizeText(params.text)
+  const fileName = sanitizeText(params.fileName)
   const uploadedAt = new Date(uploadTimestamp)
 
   await prisma.document.update({

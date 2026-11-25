@@ -6,29 +6,10 @@ import { getGemini, GEMINI_VISUAL_MODEL, GEMINI_VISUAL_FALLBACK_MODEL } from "./
  * Split out of the route itself so the pdf2json wiring has one home.
  */
 
-export const PDF_TYPES = ["application/pdf"]
-export const TXT_TYPES = ["text/plain"]
-// Formats OpenAI's transcription endpoint accepts.
-export const AUDIO_TYPES = ["audio/mpeg", "audio/mp3", "audio/mp4", "audio/wav", "audio/webm", "audio/m4a", "audio/x-m4a", "video/mp4", "video/webm"]
-export const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"]
-export const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
-export const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
-
-export function isPdf(name: string, type: string): boolean {
-  return PDF_TYPES.includes(type) || name.toLowerCase().endsWith(".pdf")
-}
-
-export function isTxt(name: string, type: string): boolean {
-  return TXT_TYPES.includes(type) || name.toLowerCase().endsWith(".txt")
-}
-
-export function isAudio(name: string, type: string): boolean {
-  return AUDIO_TYPES.includes(type) || AUDIO_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext))
-}
-
-export function isImage(name: string, type: string): boolean {
-  return IMAGE_TYPES.includes(type) || IMAGE_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext))
-}
+export {
+  PDF_TYPES, TXT_TYPES, AUDIO_TYPES, AUDIO_EXTENSIONS, IMAGE_TYPES, IMAGE_EXTENSIONS,
+  isPdf, isTxt, isDocx, isPptx, isAudio, isImage,
+} from "@/lib/upload-types"
 
 /** decodeURIComponent that never throws on malformed/partial escape sequences. */
 function safeDecode(value: string): string {
