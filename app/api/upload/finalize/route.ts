@@ -7,7 +7,9 @@ import { ingestDocument } from "@/lib/rag/ingest"
 import { assertEmbeddingEnv } from "@/lib/rag/clients"
 import { transcribeAudio } from "@/lib/rag/transcribe"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
-import { isPdf, isTxt, isAudio, isImage, extractPdfText, extractViaOcr } from "@/lib/rag/extract-text"
+import { isPdf, isTxt, isDocx, isPptx, isAudio, isImage, extractPdfText, extractViaOcr } from "@/lib/rag/extract-text"
+import { extractDocxText, extractPptxText } from "@/lib/rag/extract-office"
+import { MAX_DOC_BYTES, MAX_AUDIO_BYTES, UNSUPPORTED_FILE_MESSAGE } from "@/lib/upload-types"
 import { logActivity } from "@/lib/activity-log"
 import { sanitizeText } from "@/lib/rag/sanitize-text"
 
@@ -34,9 +36,6 @@ export const runtime = "nodejs"
 // embed/upsert work that now runs via after() below.
 export const maxDuration = 60
 
-const MAX_BYTES = 15 * 1024 * 1024 // 15 MB (PDF/TXT)
-// OpenAI's transcription endpoint hard-caps uploads at 25MB; stay under it.
-const MAX_AUDIO_BYTES = 24 * 1024 * 1024 // 24 MB
 
 export async function POST(req: Request) {
   try {
@@ -108,10 +107,12 @@ export async function POST(req: Request) {
     const pdf = isPdf(fileName, contentType)
     const txt = isTxt(fileName, contentType)
     const image = isImage(fileName, contentType)
-    if (!pdf && !txt && !audio && !image) {
+    const docx = isDocx(fileName, contentType)
+    const pptx = isPptx(fileName, contentType)
+    if (!pdf && !txt && !audio && !image && !docx && !pptx) {
       await del(blobUrl).catch(() => {})
       return NextResponse.json(
-        { error: "סוג קובץ לא נתמך (PDF, TXT, תמונה או הקלטת שיעור)" },
+        { error: UNSUPPORTED_FILE_MESSAGE },
         { status: 415 }
       )
     }
@@ -123,17 +124,21 @@ export async function POST(req: Request) {
     }
     if (audio && bytes.byteLength > MAX_AUDIO_BYTES) {
       await del(blobUrl).catch(() => {})
-      return NextResponse.json({ error: "Audio file too large (max 24MB)" }, { status: 413 })
+      return NextResponse.json({ error: `קובץ ההקלטה גדול מדי (מקסימום ${MAX_AUDIO_BYTES / 1024 / 1024}MB)` }, { status: 413 })
     }
-    if (!audio && bytes.byteLength > MAX_BYTES) {
+    if (!audio && bytes.byteLength > MAX_DOC_BYTES) {
       await del(blobUrl).catch(() => {})
-      return NextResponse.json({ error: "File too large (max 15MB)" }, { status: 413 })
+      return NextResponse.json({ error: `הקובץ גדול מדי (מקסימום ${MAX_DOC_BYTES / 1024 / 1024}MB)` }, { status: 413 })
     }
 
     let text: string
     try {
       if (audio) {
         text = await transcribeAudio(new File([bytes], fileName, { type: contentType }))
+      } else if (docx) {
+        text = await extractDocxText(bytes)
+      } else if (pptx) {
+        text = await extractPptxText(bytes)
       } else if (image) {
         // No text layer to try first — a photo is OCR'd straight away.
         text = await extractViaOcr(bytes, contentType || "image/jpeg")
@@ -169,7 +174,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const fileType = audio ? "audio" : pdf ? "pdf" : image ? "image" : "txt"
+    const fileType = audio ? "audio" : pdf ? "pdf" : docx ? "docx" : pptx ? "pptx" : image ? "image" : "txt"
     const document = await prisma.document.create({
       data: {
         userId,

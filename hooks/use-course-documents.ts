@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { upload } from "@vercel/blob/client"
 import { readJson } from "@/lib/http"
-import { isAudio, isSupportedMaterial, resolveContentType, UNSUPPORTED_FILE_MESSAGE } from "@/lib/upload-types"
+import { isAudio, isSupportedMaterial, resolveContentType, MAX_AUDIO_BYTES, MAX_DOC_BYTES, UNSUPPORTED_FILE_MESSAGE } from "@/lib/upload-types"
 import type { ExamDateEntry } from "@/components/exam-dates-card"
 
 /**
@@ -168,6 +168,12 @@ export function useCourseDocuments(courseCode: string | undefined) {
   const selectFile = (file: File) => {
     if (!isSupportedMaterial(file.name, file.type)) {
       setUploadStatus(UNSUPPORTED_FILE_MESSAGE)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      return
+    }
+    const limit = isAudioFile(file) ? MAX_AUDIO_BYTES : MAX_DOC_BYTES
+    if (file.size > limit) {
+      setUploadStatus(`הקובץ גדול מדי (${Math.round(file.size / 1024 / 1024)}MB). המקסימום הוא ${limit / 1024 / 1024}MB.`)
       if (fileInputRef.current) fileInputRef.current.value = ""
       return
     }

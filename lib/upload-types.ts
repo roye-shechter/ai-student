@@ -5,7 +5,15 @@
  */
 
 export const PDF_TYPES = ["application/pdf"]
-export const TXT_TYPES = ["text/plain"]
+export const TXT_TYPES = ["text/plain", "text/markdown", "text/csv"]
+export const TXT_EXTENSIONS = [".txt", ".md", ".csv"]
+export const DOCX_TYPES = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+export const PPTX_TYPES = ["application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+
+// Size ceilings. Documents are downloaded into function memory and parsed;
+// audio is capped by OpenAI's transcription endpoint (25MB hard limit).
+export const MAX_DOC_BYTES = 50 * 1024 * 1024
+export const MAX_AUDIO_BYTES = 24 * 1024 * 1024
 // Formats OpenAI's transcription endpoint accepts, plus the MIME aliases
 // browsers/OSes actually report for them (e.g. Chrome/Firefox on Windows
 // report WAV as audio/x-wav or audio/wave, macOS reports M4A as audio/x-m4a).
@@ -19,15 +27,15 @@ export const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav
 export const IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
 export const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
 
-export const ALL_UPLOAD_TYPES = [...PDF_TYPES, ...TXT_TYPES, ...AUDIO_TYPES, ...IMAGE_TYPES]
+export const ALL_UPLOAD_TYPES = [...PDF_TYPES, ...TXT_TYPES, ...DOCX_TYPES, ...PPTX_TYPES, ...AUDIO_TYPES, ...IMAGE_TYPES]
 
 /** `accept` attribute value for file inputs that take any supported material. */
 export const MATERIAL_ACCEPT = [
-  ".pdf", ".txt", ...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS,
-  ...PDF_TYPES, ...TXT_TYPES, "image/jpeg", "image/png", "image/webp", "audio/*", "video/mp4", "video/webm",
+  ".pdf", ".docx", ".pptx", ...TXT_EXTENSIONS, ...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS,
+  ...PDF_TYPES, ...DOCX_TYPES, ...PPTX_TYPES, ...TXT_TYPES, "image/jpeg", "image/png", "image/webp", "audio/*", "video/mp4", "video/webm",
 ].join(",")
 
-export const UNSUPPORTED_FILE_MESSAGE = "סוג קובץ לא נתמך. אפשר להעלות PDF, TXT, תמונה (JPG/PNG/WEBP) או הקלטת שיעור (MP3/M4A/WAV/MP4/WEBM)."
+export const UNSUPPORTED_FILE_MESSAGE = "סוג קובץ לא נתמך. אפשר להעלות PDF, Word (DOCX), PowerPoint (PPTX), TXT, תמונה (JPG/PNG/WEBP) או הקלטת שיעור (MP3/M4A/WAV/MP4/WEBM). קבצי DOC/PPT ישנים — שמור אותם כ-DOCX/PPTX."
 
 function hasExt(name: string, exts: string[]): boolean {
   const lower = name.toLowerCase()
@@ -39,7 +47,15 @@ export function isPdf(name: string, type: string): boolean {
 }
 
 export function isTxt(name: string, type: string): boolean {
-  return TXT_TYPES.includes(type) || name.toLowerCase().endsWith(".txt")
+  return TXT_TYPES.includes(type) || hasExt(name, TXT_EXTENSIONS)
+}
+
+export function isDocx(name: string, type: string): boolean {
+  return DOCX_TYPES.includes(type) || name.toLowerCase().endsWith(".docx")
+}
+
+export function isPptx(name: string, type: string): boolean {
+  return PPTX_TYPES.includes(type) || name.toLowerCase().endsWith(".pptx")
 }
 
 export function isAudio(name: string, type: string): boolean {
@@ -51,12 +67,16 @@ export function isImage(name: string, type: string): boolean {
 }
 
 export function isSupportedMaterial(name: string, type: string): boolean {
-  return isPdf(name, type) || isTxt(name, type) || isAudio(name, type) || isImage(name, type)
+  return (
+    isPdf(name, type) || isTxt(name, type) || isDocx(name, type) || isPptx(name, type) ||
+    isAudio(name, type) || isImage(name, type)
+  )
 }
 
 const EXTENSION_MIME: Record<string, string> = {
   ".pdf": "application/pdf",
-  ".txt": "text/plain",
+  ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv",
+  ".docx": DOCX_TYPES[0], ".pptx": PPTX_TYPES[0],
   ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
   ".mp3": "audio/mpeg", ".mpga": "audio/mpeg", ".mpeg": "audio/mpeg",
   ".m4a": "audio/mp4", ".wav": "audio/wav", ".mp4": "video/mp4", ".webm": "audio/webm",

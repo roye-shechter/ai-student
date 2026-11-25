@@ -8,7 +8,7 @@ import { getGemini, GEMINI_VISUAL_MODEL, GEMINI_VISUAL_FALLBACK_MODEL } from "./
 
 export {
   PDF_TYPES, TXT_TYPES, AUDIO_TYPES, AUDIO_EXTENSIONS, IMAGE_TYPES, IMAGE_EXTENSIONS,
-  isPdf, isTxt, isAudio, isImage,
+  isPdf, isTxt, isDocx, isPptx, isAudio, isImage,
 } from "@/lib/upload-types"
 
 /** decodeURIComponent that never throws on malformed/partial escape sequences. */
