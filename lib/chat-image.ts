@@ -15,7 +15,12 @@ const JPEG_QUALITY = 0.85
 export async function prepareChatImage(file: File): Promise<ChatImage> {
   if (!file.type.startsWith("image/")) throw new Error("יש לבחור קובץ תמונה")
 
-  const bitmap = await createImageBitmap(file)
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new Error("לא ניתן לקרוא את התמונה. אם זו תמונת HEIC/HEIF מאייפון, המר אותה ל-JPG או צלם שוב.")
+  }
   try {
     const scale = Math.min(1, MAX_SIDE_PX / Math.max(bitmap.width, bitmap.height))
     const canvas = document.createElement("canvas")

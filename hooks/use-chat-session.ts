@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react"
 import { readJson } from "@/lib/http"
 import { prepareChatImage, type ChatImage } from "@/lib/chat-image"
+import { isImage, isSupportedMaterial, UNSUPPORTED_FILE_MESSAGE } from "@/lib/upload-types"
 import type { SourceChunk } from "@/components/chat/source-citations"
 
 /**
@@ -21,7 +22,12 @@ type ChatStreamEvent =
   | { type: "done" }
   | { type: "error"; message: string }
 
-export function useChatSession(courseCode: string | undefined) {
+export function useChatSession(
+  courseCode: string | undefined,
+  /** Called for a non-image file picked via the attach button (PDF/TXT/audio):
+   * it is added to the course materials instead of being sent as a chat image. */
+  onDocumentFile?: (file: File) => void
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", text: "שלום! אני המורה הפרטי שלך לקורס זה. העלה חומרי לימוד, ואשמח ללמד אותך, להסביר ולענות על כל שאלה — מבוסס מדויק על החומר שהעלית." },
   ])
@@ -141,6 +147,16 @@ export function useChatSession(courseCode: string | undefined) {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
+    if (!isImage(file.name, file.type)) {
+      // Not a photo — PDFs, text files and recordings become course materials
+      // (name dialog -> upload -> indexing) rather than being rejected.
+      if (isSupportedMaterial(file.name, file.type) && onDocumentFile) {
+        onDocumentFile(file)
+      } else {
+        setChatError({ message: UNSUPPORTED_FILE_MESSAGE, retryText: "" })
+      }
+      return
+    }
     try {
       setPendingImage(await prepareChatImage(file))
     } catch (error) {

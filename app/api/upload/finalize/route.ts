@@ -9,6 +9,7 @@ import { transcribeAudio } from "@/lib/rag/transcribe"
 import { assertUnderDailyLimit, RateLimitExceededError } from "@/lib/rate-limit"
 import { isPdf, isTxt, isAudio, isImage, extractPdfText, extractViaOcr } from "@/lib/rag/extract-text"
 import { logActivity } from "@/lib/activity-log"
+import { sanitizeText } from "@/lib/rag/sanitize-text"
 
 /**
  * Document ingestion — finalize step.
@@ -155,6 +156,10 @@ export async function POST(req: Request) {
         { status: 422 }
       )
     }
+
+    // Strip NUL bytes etc. — Postgres rejects them and ingestion would fail
+    // in the background after the client was already told "uploaded".
+    text = sanitizeText(text)
 
     if (!text.trim()) {
       await del(blobUrl).catch(() => {})

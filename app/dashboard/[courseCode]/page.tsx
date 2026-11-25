@@ -16,6 +16,7 @@ import { CourseProgressSnapshot } from "@/components/course-progress-snapshot"
 import { TutorBoard, extractBoardItems, stripBoardBlocks } from "@/components/tutor-board"
 import { gsap, useGSAP } from "@/lib/gsap"
 import { useChatSession } from "@/hooks/use-chat-session"
+import { MATERIAL_ACCEPT } from "@/lib/upload-types"
 import { useCourseDocuments } from "@/hooks/use-course-documents"
 import {
   FolderOpen, ArrowRight, ArrowLeft, Send, User, AlertCircle, Square, RotateCcw, GraduationCap,
@@ -56,6 +57,7 @@ export default function CoursePage() {
     isUploading,
     uploadStatus,
     pendingFile,
+    selectFile,
     onFileSelected,
     handleNameConfirm,
     handleNameCancel,
@@ -75,7 +77,7 @@ export default function CoursePage() {
     handlePickImage,
     handleStop,
     handleRetry,
-  } = useChatSession(courseCode)
+  } = useChatSession(courseCode, selectFile)
 
   const [showManageDialog, setShowManageDialog] = useState(false)
 
@@ -174,7 +176,7 @@ export default function CoursePage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,.mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,application/pdf,text/plain,image/jpeg,image/png,image/webp,audio/*,video/mp4,video/webm"
+              accept={MATERIAL_ACCEPT}
               onChange={onFileSelected}
               className="hidden"
               disabled={isUploading}
@@ -328,6 +330,9 @@ export default function CoursePage() {
           </CardContent>
 
           <CardFooter className="border-t border-[#242b3a] p-4 bg-[#0a0e14]/20 flex-col items-stretch gap-2">
+            {uploadStatus && (
+              <p className="text-xs text-[#ffb066] self-start" role="status">{uploadStatus}</p>
+            )}
             {pendingImage && (
               <div className="flex items-center gap-2 self-start bg-[#161b26] border border-[#242b3a] rounded-lg p-1.5 pr-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -347,7 +352,7 @@ export default function CoursePage() {
               <input
                 ref={imageInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={MATERIAL_ACCEPT}
                 className="hidden"
                 onChange={handlePickImage}
               />
@@ -355,7 +360,8 @@ export default function CoursePage() {
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
                 disabled={isLoading}
-                aria-label="צרף תמונה"
+                aria-label="צרף תמונה או קובץ (PDF, TXT, הקלטה)"
+                title="צרף תמונה לשאלה, או קובץ/הקלטה לחומרי הקורס"
                 className="bg-[#161b26] hover:bg-[#242b3a] text-[#8b93a3] hover:text-[#ffb066] border border-[#242b3a] h-12 px-3 rounded-full transition-all duration-300"
               >
                 <ImagePlus size={18} />

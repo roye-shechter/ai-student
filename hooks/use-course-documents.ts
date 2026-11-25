@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { upload } from "@vercel/blob/client"
 import { readJson } from "@/lib/http"
+import { isAudio, isSupportedMaterial, resolveContentType, UNSUPPORTED_FILE_MESSAGE } from "@/lib/upload-types"
 import type { ExamDateEntry } from "@/components/exam-dates-card"
 
 /**
@@ -30,9 +31,8 @@ export type CourseDocument = {
   createdAt: string
 }
 
-const AUDIO_EXTENSIONS = [".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm"]
 function isAudioFile(file: File): boolean {
-  return file.type.startsWith("audio/") || AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+  return file.type.startsWith("audio/") || isAudio(file.name, file.type)
 }
 
 export function useCourseDocuments(courseCode: string | undefined) {
@@ -127,6 +127,9 @@ export function useCourseDocuments(courseCode: string | undefined) {
       // size limit to worry about.
       const blob = await upload(file.name, file, {
         access: "private",
+        // Browsers often report an empty/unusual MIME type; the token route
+        // only accepts known ones, so send the one implied by the extension.
+        contentType: resolveContentType(file.name, file.type),
         handleUploadUrl: "/api/upload/token",
       })
 
@@ -161,9 +164,20 @@ export function useCourseDocuments(courseCode: string | undefined) {
   // Picking a file doesn't upload it immediately — it opens NameDocumentDialog
   // first (required naming step). Only handleNameConfirm actually starts the
   // upload, once a name is given.
+  // Shared by the materials picker and the chat's attach button.
+  const selectFile = (file: File) => {
+    if (!isSupportedMaterial(file.name, file.type)) {
+      setUploadStatus(UNSUPPORTED_FILE_MESSAGE)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      return
+    }
+    setUploadStatus(null)
+    setPendingFile(file)
+  }
+
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setPendingFile(file)
+    if (file) selectFile(file)
   }
 
   const handleNameConfirm = (title: string) => {
@@ -189,6 +203,7 @@ export function useCourseDocuments(courseCode: string | undefined) {
     isUploading,
     uploadStatus,
     pendingFile,
+    selectFile,
     onFileSelected,
     handleNameConfirm,
     handleNameCancel,
