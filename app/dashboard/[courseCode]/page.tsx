@@ -368,7 +368,7 @@ export default function CoursePage() {
               </Button>
               <Input
                 type="text"
-                placeholder={`שאל אותי על חומר הלימוד של ${courseTitle}...`}
+                placeholder={pendingImage ? "הוסף שאלה על התמונה, או פשוט שלח..." : `שאל אותי על חומר הלימוד של ${courseTitle}...`}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}

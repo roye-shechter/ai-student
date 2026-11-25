@@ -14,6 +14,8 @@ import type { SourceChunk } from "@/components/chat/source-citations"
  * the two hooks don't share state.
  */
 
+const DEFAULT_IMAGE_QUESTION = "הסבר לי מה מופיע בתמונה הזו, ועזור לי להבין אותה בהקשר של הקורס."
+
 export type ChatMessage = { role: string; text: string; chunks?: SourceChunk[]; imagePreview?: string }
 
 type ChatStreamEvent =
@@ -135,8 +137,10 @@ export function useChatSession(
   )
 
   const handleSendMessage = () => {
-    if (!input.trim() || isLoading) return
-    const text = input
+    // An attached image is enough to send — with no typed question, ask the
+    // tutor to explain it (the API requires a non-empty message).
+    if ((!input.trim() && !pendingImage) || isLoading) return
+    const text = input.trim() ? input : DEFAULT_IMAGE_QUESTION
     const image = pendingImage ?? undefined
     setInput("")
     setPendingImage(null)
