@@ -276,7 +276,11 @@ export default function CoursePage() {
             </div>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-y-auto scroll-smooth p-4 space-y-4 min-h-[300px]">
+          {/* min-h-0 (not a fixed minimum): this area must be able to shrink and
+              scroll, otherwise on a short window the card (overflow-hidden,
+              fixed height) clips the footer — and with it the send button —
+              off-screen, which an attached image's preview row made worse. */}
+          <CardContent className="flex-1 min-h-0 overflow-y-auto scroll-smooth p-4 space-y-4">
             {messages.map((msg, index) => {
               const isStreamingThisMessage = isLoading && streamStarted && index === messages.length - 1 && msg.role === "assistant"
               return (
@@ -329,7 +333,7 @@ export default function CoursePage() {
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-[#242b3a] p-4 bg-[#0a0e14]/20 flex-col items-stretch gap-2">
+          <CardFooter className="shrink-0 border-t border-[#242b3a] p-4 bg-[#0a0e14]/20 flex-col items-stretch gap-2">
             {uploadStatus && (
               <p className="text-xs text-[#ffb066] self-start" role="status">{uploadStatus}</p>
             )}
